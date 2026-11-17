@@ -166,6 +166,26 @@ describe("parseEmphasis block layout", () => {
     expect(data?.text).toBe(source);
     expect(data?.phase).toBe("streaming");
   });
+
+  test("keeps a table with pill markup whole in one markdown block", () => {
+    const source = [
+      "| Module | State | Note |",
+      "| --- | --- | --- |",
+      "| parse | [[Done]] | gauge and tree tokens |",
+    ].join("\n");
+    // Nothing left to decorate: the whole message, table with its literal cell
+    // markup included, goes back to the host renderer with its copy affordance.
+    expect(parseEmphasis(source, "complete")).toBeNull();
+  });
+
+  test("renders a decorated table cell line as markdown, not a chunk", () => {
+    const source = "[[Done]] shipped\n\n| a | b |\n| --- | --- |\n| 1 | [[Needs you]] |";
+    const data = parseEmphasis(source, "complete");
+    expect(data?.blocks.map((block) => block.type)).toEqual(["chunk", "markdown"]);
+    const table = data?.blocks[1];
+    expect(table?.type === "markdown" && table.text.startsWith("| a | b |")).toBe(true);
+    expect(table?.type === "markdown" && table.text.includes("[[Needs you]]")).toBe(true);
+  });
 });
 
 function segmentsOf(data: ReturnType<typeof parseEmphasis>) {

@@ -36,6 +36,11 @@ function hasDecorations(line: string): boolean {
   return /\*\*|__|\[\[|→|[✓✔✗✘]|[├└]──|[▰▱]/.test(line);
 }
 
+/** Any GFM table row: header, delimiter, or body cell run. */
+function isTableRow(line: string): boolean {
+  return line.trimStart().startsWith("|");
+}
+
 interface PillLabel {
   /** Display text: canonical word plus any detail, such as "Passed 12/12". */
   label: string;
@@ -233,6 +238,9 @@ function collapse(segments: EmphasisSegment[]): EmphasisSegment[] {
  * Decorated lines become chunk blocks rendered by this plugin; plain runs and fenced code stay
  * markdown blocks for the host renderer. Data is render-only: the original markdown travels in
  * `text` so copying always yields the source with `[[...]]` intact.
+ *
+ * Markdown tables are never decorated: every `|`-row stays in one contiguous markdown block so
+ * the host renders the complete table; pill markup inside cells keeps its literal source form.
  */
 export function parseEmphasis(markdown: string, phase: EmphasisData["phase"]): EmphasisData | null {
   const blocks: EmphasisData["blocks"] = [];
@@ -242,7 +250,7 @@ export function parseEmphasis(markdown: string, phase: EmphasisData["phase"]): E
 
   const flushPlain = () => {
     if (plain.some((line) => line.trim().length > 0)) {
-      blocks.push({ type: "markdown", text: plain.join("\n") });
+      blocks.push({ type: "markdown", text: plain.join("\n").replace(/^\n+/, "") });
     }
     plain = [];
   };
@@ -270,6 +278,13 @@ export function parseEmphasis(markdown: string, phase: EmphasisData["phase"]): E
     if (line.trim().length === 0) {
       flushChunk();
       plain.push(line);
+      continue;
+    }
+    if (isTableRow(line)) {
+      // A decorated row must not split its table: hand the row, decoration and all,
+      // to the host markdown block, so the table renders whole.
+      flushChunk();
+      plain.push(line.trimStart());
       continue;
     }
     if (hasDecorations(line)) {
