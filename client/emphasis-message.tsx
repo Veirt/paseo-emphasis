@@ -21,7 +21,7 @@ interface ToneVisual {
   foreground: string;
 }
 
-/** Translucent pill fills, approximated by appending hex alpha to a theme color. */
+/** Translucent pill fills; unknown tones read as neutral, in the body color. */
 function tinted(hex: string, alpha255: number): string {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
   return `${hex}${alpha255.toString(16).padStart(2, "0")}`;
@@ -35,23 +35,23 @@ function toneVisual(tone: EmphasisTone, colors: ThemeColors): ToneVisual {
     accent,
     accentForeground,
     foreground,
-    surface0,
+    surface1,
   } = colors;
   switch (tone) {
     case "success":
-      return { background: tinted(statusSuccess, 0x1f), foreground: statusSuccess };
+      return { background: tinted(statusSuccess, 0x2e), foreground: statusSuccess };
     case "warning":
-      return { background: tinted(statusWarning, 0x26), foreground: statusWarning };
+      return { background: tinted(statusWarning, 0x33), foreground: statusWarning };
     case "error":
-      return { background: tinted(statusDanger, 0x1f), foreground: statusDanger };
+      return { background: tinted(statusDanger, 0x2e), foreground: statusDanger };
     case "danger":
       return { background: statusDanger, foreground: accentForeground };
     case "mode":
       return { background: accent, foreground: accentForeground };
     case "owner":
-      return { background: foreground, foreground: surface0 };
+      return { background: foreground, foreground: surface1 };
     default:
-      return { background: tinted(accent, 0x1a), foreground: accent };
+      return { background: tinted(foreground, 0x1f), foreground };
   }
 }
 
@@ -65,11 +65,18 @@ function headingSize(level: number, compact: boolean): number {
   return (compact ? small : regular)[level - 1] ?? 14;
 }
 
+/** Spacing around a section heading: air above, a tight tie to its content. */
+const HEADING_GAP_TOP = 18;
+const HEADING_GAP_BOTTOM = 6;
+/** Where heading text and section-level rows indent to, past the icon column. */
+const SECTION_INDENT = 22;
+
 interface EmphasisStyles {
   message: ViewStyle;
   chunk: ViewStyle;
   leadRow: ViewStyle;
   leadRest: TextStyle;
+  sectionRow: ViewStyle;
   line: TextStyle;
   bold: TextStyle;
   code: TextStyle;
@@ -91,24 +98,33 @@ interface RenderKit {
 function buildStyles(theme: ThemeColors, compact: boolean, platform: Platform): EmphasisStyles {
   const fontSize = compact ? 13 : 14;
   return {
-    message: { gap: compact ? 6 : 8 },
+    message: {
+      gap: compact ? 6 : 8,
+      paddingVertical: compact ? 2 : 4,
+      paddingHorizontal: compact ? 2 : 4,
+      paddingBottom: compact ? 6 : 8,
+    },
     chunk: { gap: 2 },
-    leadRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    sectionRow: {
+      marginTop: compact ? 14 : HEADING_GAP_TOP,
+      marginBottom: compact ? 3 : HEADING_GAP_BOTTOM,
+    },
+    leadRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     leadRest: { flex: 1 },
     line: { fontSize, color: theme.foreground },
-    bold: { color: theme.accent, fontWeight: "600" },
+    bold: { fontWeight: "600" },
     code: { fontSize, fontFamily: monospaceFamily(platform), color: theme.foregroundMuted },
     pillInline: { fontWeight: "600" },
     pill: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      gap: 5,
       borderRadius: 999,
-      paddingHorizontal: compact ? 6 : 8,
+      paddingHorizontal: compact ? 8 : 10,
       paddingVertical: 2,
     },
     pillText: { fontSize, fontWeight: "600" },
-    copyButton: { alignSelf: "flex-start", paddingTop: 2, opacity: 0.7 },
+    copyButton: { alignSelf: "flex-start", padding: 4, opacity: 0.7 },
   };
 }
 
@@ -153,7 +169,7 @@ function renderInlineSegment(segment: EmphasisSegment, kit: RenderKit, key: numb
       );
     case "arrow":
       return (
-        <Text key={key} style={{ color: theme.colors.accent }}>
+        <Text key={key} style={{ color: theme.colors.foregroundMuted }}>
           →
         </Text>
       );
@@ -198,19 +214,14 @@ function renderInlineLine(segments: EmphasisSegment[], kit: RenderKit, key: numb
 function renderLine(line: EmphasisLine, kit: RenderKit, key: number): ReactNode {
   const { styles, theme } = kit;
 
-  // A heading is icon plus one bold text run: row siblings keep the icon out of the Text.
+  // A section heading: air above, a tight tie to its content, icon as a sibling.
   if (line.heading) {
     const size = headingSize(line.heading, kit.compact);
-    const headingStyle: TextStyle = {
-      ...styles.line,
-      fontSize: size,
-      fontWeight: "600",
-    };
     const icon = line.segments[0];
     const title = icon?.type === "icon" ? line.segments[1] : icon;
     const text = title?.type === "text" ? title.text : "";
     return (
-      <View key={key} style={styles.leadRow}>
+      <View key={key} style={[styles.sectionRow, styles.leadRow]}>
         {icon?.type === "icon" ? (
           <Icon name={icon.name} size={size - 3} color={theme.colors.accent} />
         ) : null}
@@ -218,7 +229,7 @@ function renderLine(line: EmphasisLine, kit: RenderKit, key: number): ReactNode 
           text={text}
           phase={kit.phase}
           selectable
-          style={[headingStyle, { flex: 1 }]}
+          style={[kit.styles.line, { fontSize: size, fontWeight: "600", flex: 1 }]}
         />
       </View>
     );
@@ -230,7 +241,10 @@ function renderLine(line: EmphasisLine, kit: RenderKit, key: number): ReactNode 
   }
 
   return (
-    <View key={key} style={styles.leadRow}>
+    <View
+      key={key}
+      style={[styles.leadRow, layout.prefixText === "" ? { paddingLeft: SECTION_INDENT } : null]}
+    >
       {layout.prefixText.length > 0 ? (
         <Text selectable style={styles.line}>
           {layout.prefixText}

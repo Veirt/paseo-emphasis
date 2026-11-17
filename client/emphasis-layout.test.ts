@@ -104,3 +104,41 @@ describe("planLineLayout over parsed lines", () => {
     expect(data).toBeNull();
   });
 });
+
+describe("review fixes", () => {
+  it("gives a bold lead label its own hanging-indent row", () => {
+    const layout = planLineLayout([
+      text("- "),
+      text("Why neutral:", true),
+      text(" numbers never claim a verdict"),
+    ]);
+    expect(layout).toEqual({
+      type: "row",
+      prefixText: "- ",
+      labelText: "Why neutral:",
+      chips: [],
+      rest: [text(" numbers never claim a verdict")],
+    });
+  });
+
+  it("normalizes uneven list-marker spacing", () => {
+    const layout = planLineLayout([text("-  "), text("squished", true), text(" tail")]);
+    expect(layout.type === "row" && layout.prefixText).toBe("- ");
+  });
+
+  it("keeps a mid-sentence pill inline after a bold label", () => {
+    const layout = planLineLayout([
+      text("- "),
+      text("Copy check:", true),
+      text(" the source is "),
+      pill("Done"),
+    ]);
+    expect(layout).toEqual({
+      type: "row",
+      prefixText: "- ",
+      labelText: "Copy check:",
+      chips: [],
+      rest: [text(" the source is "), pill("Done")],
+    });
+  });
+});

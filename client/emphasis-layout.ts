@@ -6,9 +6,9 @@ export type PillSegment = Extract<EmphasisSegment, { type: "pill" }>;
  * How one parsed line turns into native views. A line never places a `View`
  * inside a `Text`, because inline views break text selection and baseline
  * alignment; instead a line becomes either a leading row (an optional list
- * marker, an optional icon, an optional lead label, a run of chips, then
- * flowing text) or plain inline text where pills degrade to colored bold
- * labels.
+ * marker, an optional icon, an optional bold lead label, a run of chips, then
+ * flowing text that wraps with a hanging indent) or plain inline text where
+ * pills degrade to colored bold labels.
  */
 export type LineLayout =
   | {
@@ -24,12 +24,18 @@ export type LineLayout =
 export type RowLayout = Extract<LineLayout, { type: "row" }>;
 
 /** Text before a lead element: only whitespace or a list marker qualifies. */
-const LIST_PREFIX = /^\s*(?:[-*+]|\d+\.)?\s*$/;
+const LIST_PREFIX = /^(?:[-*+]|\d+\.)?\s*$/;
 
 function isBlankText(
   segment: EmphasisSegment | undefined,
 ): segment is Extract<EmphasisSegment, { type: "text" }> {
   return segment?.type === "text" && LIST_PREFIX.test(segment.text);
+}
+
+function isBoldText(
+  segment: EmphasisSegment | undefined,
+): segment is Extract<EmphasisSegment, { type: "text" }> {
+  return segment?.type === "text" && segment.bold;
 }
 
 function toPill(segment: EmphasisSegment): PillSegment | undefined {
@@ -46,16 +52,19 @@ function rowOf(prefixText: string, chips: PillSegment[], rest?: EmphasisSegment[
 function textRunFrom(
   segments: readonly EmphasisSegment[],
   start: number,
-): {
-  text: string;
-  end: number;
-} {
+  onlyBold: boolean,
+): { text: string; end: number } {
   let text = "";
   let index = start;
   while (index < segments.length) {
     const segment = segments[index];
-    if (segment?.type !== "text") break;
-    text += segment.text;
+    if (onlyBold) {
+      if (!isBoldText(segment)) break;
+      text += segment.text;
+    } else {
+      if (segment === undefined || segment.type !== "text") break;
+      text += segment.text;
+    }
     index += 1;
   }
   return { text, end: index };
@@ -63,8 +72,8 @@ function textRunFrom(
 
 /**
  * Collects the pill run starting at `start`, skipping blank separators. Returns
- * the chips, the index of the first non-pill segment, and whether the run
- * consumed everything to the end of the line.
+ * the chips, the index just past the run, and whether the run consumed
+ * everything to the end of the line.
  */
 function pillRunFrom(
   segments: readonly EmphasisSegment[],
@@ -90,10 +99,11 @@ function pillRunFrom(
 
 /**
  * Plans the native layout of one line's segments under the no-view-in-text
- * rule. A line that opens with an icon or a pill after at most a list marker
- * renders as a leading row; pills already at the lead keep their chip shape,
- * and pills deeper in the line degrade to styled text. Anything else renders
- * inline.
+ * rule. A line that opens with an icon, a bold lead label, or a pill after at
+ * most a list marker renders as a leading row; pills already at the lead keep
+ * their chip shape, and pills deeper in the line degrade to styled text.
+ * Anything else renders inline. The list marker is normalized to one trailing
+ * space so uneven source spacing cannot skew the indent.
  */
 export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
   let index = 0;
@@ -104,6 +114,7 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
     prefixText += segment.text;
     index += 1;
   }
+  prefixText = prefixText.replace(/\s+/g, " ");
 
   const first = segments[index];
   if (first === undefined) {
@@ -116,19 +127,29 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
   }
 
   if (first.type === "icon") {
-    const label = textRunFrom(segments, index + 1);
-    if (label.end >= segments.length) {
+    const label = textRunFrom(segments, index + 1, false);
+    const run = pillRunFrom(segments, label.end);
+    if (run.chips.length === 0) {
       const row = rowOf(prefixText, [], segments.slice(index + 1));
       row.icon = first.name;
       return row;
     }
-    const run = pillRunFrom(segments, label.end);
-    if (run.chips.length === 0) {
-      return rowOf(prefixText, [], segments.slice(index + 1));
-    }
     const row = rowOf(prefixText, run.chips, run.consumedAll ? undefined : segments.slice(run.end));
-    row.labelText = label.text.replace(/\s+$/, "");
+    row.labelText = label.text.trimEnd();
     row.icon = first.name;
+    return row;
+  }
+
+  if (isBoldText(first) && prefixText.length > 0) {
+    const label = textRunFrom(segments, index, true);
+    const run = pillRunFrom(segments, label.end);
+    const rest = run.consumedAll
+      ? label.end < segments.length
+        ? segments.slice(label.end)
+        : undefined
+      : segments.slice(run.end);
+    const row = rowOf(prefixText, run.chips, rest);
+    row.labelText = label.text.trimEnd();
     return row;
   }
 
