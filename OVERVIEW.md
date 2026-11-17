@@ -1,29 +1,16 @@
-<!--
-OVERVIEW.md is required to list your plugin in the registry. Keep it beside
-paseo-plugin.json in your repository at the pinned commit and in your npm package.
-Replace this comment with useful facts before publishing.
+<!-- Emphasis for Paseo renders replies written with pi-emphasis markup. -->
 
-This overview is for people choosing a plugin in Paseo, on the plugin page under
-its install command. README assumes a GitHub audience and includes technical
-details, installation instructions, and badges. Long, AI-generated READMEs leave
-people reading past that material to understand what the plugin does.
+Emphasis makes assistant replies easier to scan in Paseo. It is a port of pi-emphasis for the Pi CLI, rebuilt for Paseo's interface.
 
-Write these parts in order, including only what helps someone decide to install:
+When an assistant reply uses pi-emphasis markup, Emphasis renders it with native Paseo UI:
 
-1. Describe what your plugin is and does in plain terms first.
-2. Explain how it works only when it is not obvious.
-3. Explain setup when needed: settings, accounts, tokens, providers, tools, or
-   other plugins. Include applicable daemon version and operating system
-   requirements. Setup guidance is allowed; installation instructions are not.
-4. Explain capabilities and settings worth understanding, what each option does,
-   what the plugin reads or sends and where, permissions, and known limits.
+- A `[[Word]]` token becomes a rounded status pill with an icon, colored by its word. `[[Done]]`, `[[Passed]]`, and `[[Fixed]]` are green, `[[Failed]]` and `[[Blocked]]` are red, `[[Needs you]]`, `[[Decision]]`, and `[[Unverified]]` carry the warning color, and mode words such as `[[Investigate]]` use the theme accent. Known synonyms display as one canonical word, so `[[completed]]` reads as `[[Done]]`, and short detail is kept inside the pill, such as `[[Passed 12/12]]`.
+- Headings and bold lead labels, such as `**Cause:**` or `## Status`, gain a small icon chosen from their word.
+- Bold text carries the accent color, `→` arrows and tree connectors (`├──`, `└──`) are colored, and `✓` or `✗` marks take the success and danger colors.
+- Pills work while a reply streams, not only after it completes.
 
-Length follows complexity; a theme needs one paragraph. Choose headings only
-when they help. Use sentence case and plain factual language, with no em dashes.
-Omit installation commands, badges, changelog, contributing or license sections,
-marketing, and unsupported claims. Avoid implementation filler such as empty
-cleanup functions, theme-token field lists, or lists of absent features.
+Rendering is display only. Stored messages, exports, and the plugin's copy button all hand out the original markdown, with `[[Done]]` written exactly as the model typed it. The plugin makes no model calls and no network calls.
 
-To translate the overview, add a whole copy beside this file named for the
-language, such as OVERVIEW.zh-CN.md. Readers in that language see it instead.
--->
+Messages that contain none of this markup keep Paseo's own renderer untouched. For messages it does decorate, the plugin draws the full message: decorated lines with its own renderer, and plain paragraphs and code fences with Paseo's markdown renderer. One limit follows from that: the reply's usual hover copy button belongs to Paseo's assistant rows, so decorated replies carry the plugin's own copy button holding the original markdown instead.
+
+Colors and text sizing come from the current theme and layout on desktop, mobile, and the web client in both light and dark appearances. Requires Paseo `>=0.16.0`.
