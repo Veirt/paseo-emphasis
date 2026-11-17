@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react"],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-non-null-assertion": "error",
+    "unicorn/no-array-callback-reference": "error"
+  },
+  "ignorePatterns": [".repos", "node_modules"]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "paseo-emphasis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paseo plugin that renders assistant replies with pi-emphasis markup: status pills, label icons, and colored emphasis.",
+  "license": "MIT",
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "OVERVIEW.*.md",
+    "index.client.ts",
+    "index.client.tsx",
+    "index.server.ts",
+    "index.server.tsx",
+    "client/",
+    "server/",
+    "shared/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.16.0",
+    "@types/react": "~19.2.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "packageManager": "bun@1.4.4"
+}

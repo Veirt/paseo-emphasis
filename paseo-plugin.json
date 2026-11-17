@@ -1,0 +1,7 @@
+{
+  "id": "emphasis",
+  "name": "Emphasis",
+  "requirements": {
+    "paseo": ">=0.16.0"
+  }
+}
