@@ -10,6 +10,7 @@ import {
   type EmphasisSegment,
   type EmphasisTone,
 } from "../shared/emphasis";
+import { planLineLayout, type PillSegment } from "./emphasis-layout";
 
 type ThemeColors = PluginTimelineItemProps["theme"]["colors"];
 type Platform = PluginTimelineItemProps["layout"]["platform"];
@@ -67,9 +68,12 @@ function headingSize(level: number, compact: boolean): number {
 interface EmphasisStyles {
   message: ViewStyle;
   chunk: ViewStyle;
+  leadRow: ViewStyle;
+  leadRest: TextStyle;
   line: TextStyle;
   bold: TextStyle;
   code: TextStyle;
+  pillInline: TextStyle;
   pill: ViewStyle;
   pillText: TextStyle;
   copyButton: ViewStyle;
@@ -81,6 +85,7 @@ interface RenderKit {
   theme: PluginTimelineItemProps["theme"];
   compact: boolean;
   phase: EmphasisData["phase"];
+  fontSize: number;
 }
 
 function buildStyles(theme: ThemeColors, compact: boolean, platform: Platform): EmphasisStyles {
@@ -88,23 +93,46 @@ function buildStyles(theme: ThemeColors, compact: boolean, platform: Platform): 
   return {
     message: { gap: compact ? 6 : 8 },
     chunk: { gap: 2 },
+    leadRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    leadRest: { flex: 1 },
     line: { fontSize, color: theme.foreground },
     bold: { color: theme.accent, fontWeight: "600" },
     code: { fontSize, fontFamily: monospaceFamily(platform), color: theme.foregroundMuted },
+    pillInline: { fontWeight: "600" },
     pill: {
       flexDirection: "row",
       alignItems: "center",
       gap: 4,
       borderRadius: 999,
-      paddingHorizontal: compact ? 6 : 7,
-      paddingVertical: 1,
+      paddingHorizontal: compact ? 6 : 8,
+      paddingVertical: 2,
     },
-    pillText: { fontSize: compact ? 11 : 12, fontWeight: "600" },
+    pillText: { fontSize, fontWeight: "600" },
     copyButton: { alignSelf: "flex-start", paddingTop: 2, opacity: 0.7 },
   };
 }
 
-function renderSegment(segment: EmphasisSegment, kit: RenderKit, key: number): ReactNode {
+/** A pill drawn as a chip: a row sibling, never a child of a Text. */
+function renderChip(segment: PillSegment, kit: RenderKit, key: number): ReactNode {
+  const visual = toneVisual(segment.tone, kit.theme.colors);
+  return (
+    <View key={key} style={[kit.styles.pill, { backgroundColor: visual.background }]}>
+      {segment.icon ? (
+        <Icon name={segment.icon} size={kit.fontSize - 1} color={visual.foreground} />
+      ) : null}
+      <Text selectable style={[kit.styles.pillText, { color: visual.foreground }]}>
+        {segment.label}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A segment drawn inside flowing text, where pills degrade to colored bold
+ * labels and icons are skipped: the parser only emits them at lead positions,
+ * which the line-level planner renders as row siblings.
+ */
+function renderInlineSegment(segment: EmphasisSegment, kit: RenderKit, key: number): ReactNode {
   const { styles, theme } = kit;
   switch (segment.type) {
     case "text":
@@ -113,7 +141,8 @@ function renderSegment(segment: EmphasisSegment, kit: RenderKit, key: number): R
           key={key}
           text={segment.text}
           phase={kit.phase}
-          style={segment.bold ? [styles.line, styles.bold] : styles.line}
+          selectable
+          style={segment.bold ? styles.bold : undefined}
         />
       );
     case "code":
@@ -122,8 +151,6 @@ function renderSegment(segment: EmphasisSegment, kit: RenderKit, key: number): R
           {segment.text}
         </Text>
       );
-    case "icon":
-      return <Icon key={key} name={segment.name} size={13} color={theme.colors.accent} />;
     case "arrow":
       return (
         <Text key={key} style={{ color: theme.colors.accent }}>
@@ -145,35 +172,90 @@ function renderSegment(segment: EmphasisSegment, kit: RenderKit, key: number): R
           {segment.text}
         </Text>
       );
-    default: {
-      const visual = toneVisual(segment.tone, theme.colors);
+    case "pill": {
       return (
-        <View key={key} style={[styles.pill, { backgroundColor: visual.background }]}>
-          {segment.icon ? <Icon name={segment.icon} size={12} color={visual.foreground} /> : null}
-          <Text style={[styles.pillText, { color: visual.foreground }]}>{segment.label}</Text>
-        </View>
+        <Text
+          key={key}
+          style={[styles.pillInline, { color: toneVisual(segment.tone, theme.colors).foreground }]}
+        >
+          {segment.label}
+        </Text>
       );
     }
+    default:
+      return null;
   }
 }
 
-function renderLine(line: EmphasisLine, kit: RenderKit, key: number): ReactNode {
-  const lineStyle = line.heading
-    ? {
-        ...kit.styles.line,
-        fontSize: headingSize(line.heading, kit.compact),
-        fontWeight: "600" as const,
-      }
-    : kit.styles.line;
+function renderInlineLine(segments: EmphasisSegment[], kit: RenderKit, key: number): ReactNode {
   return (
-    <Text key={key} style={lineStyle}>
-      {line.segments.map((segment, index) => renderSegment(segment, kit, index))}
+    <Text key={key} selectable style={kit.styles.line}>
+      {segments.map((segment, index) => renderInlineSegment(segment, kit, index))}
     </Text>
   );
 }
 
+function renderLine(line: EmphasisLine, kit: RenderKit, key: number): ReactNode {
+  const { styles, theme } = kit;
+
+  // A heading is icon plus one bold text run: row siblings keep the icon out of the Text.
+  if (line.heading) {
+    const size = headingSize(line.heading, kit.compact);
+    const headingStyle: TextStyle = {
+      ...styles.line,
+      fontSize: size,
+      fontWeight: "600",
+    };
+    const icon = line.segments[0];
+    const title = icon?.type === "icon" ? line.segments[1] : icon;
+    const text = title?.type === "text" ? title.text : "";
+    return (
+      <View key={key} style={styles.leadRow}>
+        {icon?.type === "icon" ? (
+          <Icon name={icon.name} size={size - 3} color={theme.colors.accent} />
+        ) : null}
+        <StreamedText
+          text={text}
+          phase={kit.phase}
+          selectable
+          style={[headingStyle, { flex: 1 }]}
+        />
+      </View>
+    );
+  }
+
+  const layout = planLineLayout(line.segments);
+  if (layout.type === "inline") {
+    return renderInlineLine(layout.segments, kit, key);
+  }
+
+  return (
+    <View key={key} style={styles.leadRow}>
+      {layout.prefixText.length > 0 ? (
+        <Text selectable style={styles.line}>
+          {layout.prefixText}
+        </Text>
+      ) : null}
+      {layout.icon ? (
+        <Icon name={layout.icon} size={kit.fontSize - 1} color={theme.colors.accent} />
+      ) : null}
+      {layout.labelText ? (
+        <Text selectable style={[styles.line, styles.bold]}>
+          {layout.labelText}
+        </Text>
+      ) : null}
+      {layout.chips.map((chip, index) => renderChip(chip, kit, index))}
+      {layout.rest && layout.rest.length > 0 ? (
+        <Text selectable style={[styles.line, styles.leadRest]}>
+          {layout.rest.map((segment, index) => renderInlineSegment(segment, kit, index))}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 /**
- * Draws an assistant message that carries pi-emphasis markup. Decorated lines render through
+ * Draws an assistant message that carries emphasis markup. Decorated lines render through
  * this component; plain runs and fenced code delegate to the host Markdown renderer.
  * Rendering only: the copy affordance hands out the original markdown untouched.
  */
@@ -187,6 +269,7 @@ export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps
       theme,
       compact: layout.compact,
       phase: data.phase,
+      fontSize: layout.compact ? 13 : 14,
     }),
     [theme, layout, data.phase],
   );
