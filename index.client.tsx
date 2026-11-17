@@ -4,7 +4,9 @@ import type {
 } from "@getpaseo/plugin/client";
 import { EmphasisMessage } from "./client/emphasis-message";
 import { parseEmphasis } from "./client/parse-emphasis";
+import { EmphasisSettingsScreen } from "./client/settings";
 import { EMPHASIS_KIND, EMPHASIS_VERSION, emphasisDataSchema } from "./shared/emphasis";
+import { buildFullInstructions } from "./shared/instructions";
 
 const transformAssistantMessage: PluginTimelineTransformerContribution<"assistant_message">["transform"] =
   ({ item, phase }) => {
@@ -27,6 +29,25 @@ export default function contribute(client: PluginClientContext) {
     version: EMPHASIS_VERSION,
     schema: emphasisDataSchema,
     Component: EmphasisMessage,
+  });
+  client.addSettingsScreen({
+    id: "preferences",
+    title: "pi-emphasis",
+    icon: "Tag",
+    Component: EmphasisSettingsScreen,
+  });
+  client.addSlashCommand({
+    name: "emphasis",
+    description: "Teach this agent the emphasis reply format",
+    argumentHint: "[prompt]",
+    context: "agent",
+    async onSubmit({ args, paseo, agent }) {
+      const guidance = buildFullInstructions();
+      const prompt = args.trim()
+        ? `${guidance}\n\n${args.trim()}`
+        : `${guidance}\n\nAcknowledge briefly, then use the markup above in your replies from now on.`;
+      await paseo.agents.ref(agent.id).send(prompt);
+    },
   });
   return () => {};
 }
