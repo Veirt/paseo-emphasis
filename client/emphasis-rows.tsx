@@ -174,11 +174,7 @@ export function renderStepper(layout: StepperLayout, kit: RenderKit, key: string
             {
               label: step.label,
               tone: step.mark ? (step.mark.pass ? "success" : "error") : step.tone,
-              ...(step.mark
-                ? { icon: markIcon(step.mark.pass) }
-                : step.icon
-                  ? { icon: step.icon }
-                  : {}),
+              icon: step.mark !== undefined ? markIcon(step.mark.pass) : step.icon,
             },
             kit,
             index,

@@ -246,11 +246,7 @@ function stepperPlanAt(
     }
     let step: StepSpec | undefined;
     if (segment.type === "pill") {
-      step = {
-        label: segment.label,
-        tone: segment.tone,
-        ...(segment.icon ? { icon: segment.icon } : {}),
-      };
+      step = { label: segment.label, tone: segment.tone, icon: segment.icon };
     } else if (segment.type === "text") {
       const token = segment.text.trim();
       if (token.length === 0) continue;
@@ -267,7 +263,32 @@ function stepperPlanAt(
     open = true;
   }
   if (steps.length < 2 || arrows < 1) return undefined;
-  return { type: "stepper", ...(marker !== undefined ? { marker } : {}), steps };
+  const plan: StepperLayout = { type: "stepper", steps };
+  if (marker !== undefined) plan.marker = marker;
+  return plan;
+}
+
+/**
+ * Builds a row from the bold run at `start`: the run becomes the lead label,
+ * any pills after it become chips, and the rest of the line is the row's tail.
+ */
+function labeledRowFrom(
+  segments: readonly EmphasisSegment[],
+  start: number,
+  marker: ListMarker | undefined,
+): RowLayout {
+  const row = rowOf(marker, []);
+  const label = textRunFrom(segments, start, true);
+  const text = label.text.trimEnd();
+  if (text.length > 0) row.labelText = text;
+  const run = pillRunFrom(segments, label.end);
+  if (run.chips.length > 0) {
+    row.chips = run.chips;
+    finishRow(row, segments, run.end);
+  } else {
+    finishRow(row, segments, label.end);
+  }
+  return row;
 }
 
 /**
@@ -317,11 +338,12 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
 
   if (first.type === "gauge") {
     const rest = segments.slice(index + 1);
-    return {
+    const plan: GaugeLayout = {
       type: "gauge-row",
       gauge: { filled: first.filled, total: first.total },
-      ...(rest.length > 0 ? { rest } : {}),
     };
+    if (rest.length > 0) plan.rest = rest;
+    return plan;
   }
 
   if (first.type === "mark") {
@@ -333,34 +355,13 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
 
   if (first.type === "icon") {
     // The label is the bold run only, so plain prose after it stays normal weight.
-    const label = textRunFrom(segments, index + 1, true);
-    const row = rowOf(marker, []);
+    const row = labeledRowFrom(segments, index + 1, marker);
     row.icon = first.name;
-    const text = label.text.trimEnd();
-    if (text.length > 0) row.labelText = text;
-    const run = pillRunFrom(segments, label.end);
-    if (run.chips.length > 0) {
-      row.chips = run.chips;
-      finishRow(row, segments, run.end);
-    } else {
-      finishRow(row, segments, label.end);
-    }
     return row;
   }
 
   if (isBoldText(first) && marker !== undefined) {
-    const label = textRunFrom(segments, index, true);
-    const row = rowOf(marker, []);
-    const text = label.text.trimEnd();
-    if (text.length > 0) row.labelText = text;
-    const run = pillRunFrom(segments, label.end);
-    if (run.chips.length > 0) {
-      row.chips = run.chips;
-      finishRow(row, segments, run.end);
-    } else {
-      finishRow(row, segments, label.end);
-    }
-    return row;
+    return labeledRowFrom(segments, index, marker);
   }
 
   // Any other bulleted line still gets its glyph marker replaced by the gutter.

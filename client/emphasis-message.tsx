@@ -39,7 +39,7 @@ function renderChunkLines(lines: EmphasisLine[], kit: RenderKit, baseKey: number
         return renderStepper(entry.layout, chunkKit, key);
       case "gauge-row":
         return renderGaugeRow(entry.layout, chunkKit, key);
-      default:
+      case "inline":
         return renderInlineLine(entry.layout.segments, chunkKit, key);
     }
   });

@@ -35,8 +35,6 @@ export function hasDecorations(line: string): boolean {
   return /\*\*|__|\[\[|→|[✓✔✗✘]|[├└]──|[▰▱]/.test(line);
 }
 
-/** Any GFM table row: header, delimiter, or body cell run. */
-
 interface PillLabel {
   /** Display text: canonical word plus any detail, such as "Passed 12/12". */
   label: string;
@@ -140,12 +138,13 @@ export function parseLine(line: string): EmphasisLine {
           segments.push({ type: "text", text: whole, bold });
         } else {
           const split = splitPillLabel(pill);
-          segments.push({
+          const segment: EmphasisSegment = {
             type: "pill",
             label: split.label,
             tone: toneOf(split.key),
-            ...(split.icon ? { icon: split.icon } : {}),
-          });
+          };
+          if (split.icon !== undefined) segment.icon = split.icon;
+          segments.push(segment);
         }
       } else if (marker === "→") {
         segments.push({ type: "arrow" });
