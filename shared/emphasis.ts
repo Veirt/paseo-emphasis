@@ -52,6 +52,12 @@ export const emphasisDataSchema = z.object({
 });
 
 export type EmphasisTone = z.output<typeof emphasisToneSchema>;
+
+/** A gauge's data: how many of `total` units are filled. */
+export interface Gauge {
+  filled: number;
+  total: number;
+}
 export type EmphasisSegment = z.output<typeof emphasisSegmentSchema>;
 export type EmphasisLine = z.output<typeof emphasisLineSchema>;
 export type EmphasisBlock = z.output<typeof emphasisBlockSchema>;

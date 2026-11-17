@@ -1,15 +1,9 @@
-import type { EmphasisSegment, EmphasisTone } from "../shared/emphasis";
+import type { EmphasisSegment, EmphasisTone, Gauge } from "../shared/emphasis";
 
 export type PillSegment = Extract<EmphasisSegment, { type: "pill" }>;
 
 /** A list marker drawn in the gutter: an unordered dot or an ordered number. */
 export type ListMarker = { kind: "bullet" } | { kind: "number"; label: string };
-
-/** A gauge's data: how many of `total` units are filled. */
-export interface Gauge {
-  filled: number;
-  total: number;
-}
 
 /** One step of an arrow chain: a word or pill, with an optional status mark. */
 export interface StepSpec {

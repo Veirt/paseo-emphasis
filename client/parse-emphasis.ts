@@ -1,5 +1,6 @@
 import type { EmphasisData, EmphasisLine, EmphasisSegment, EmphasisTone } from "../shared/emphasis";
 import { CONTEXT_WORDS, VOCABULARY } from "../shared/vocabulary";
+import { ACTION_ICONS, LABEL_ICONS, PILL_ICONS, SYNONYMS } from "./emphasis-icons";
 
 const TONE_WORDS: Record<Exclude<EmphasisTone, "neutral">, string[]> = {
   danger: wordsOf("danger"),
@@ -13,128 +14,6 @@ const TONE_WORDS: Record<Exclude<EmphasisTone, "neutral">, string[]> = {
 function wordsOf(tone: Exclude<EmphasisTone, "neutral">): string[] {
   return [...VOCABULARY[tone].core, ...VOCABULARY[tone].also].map((word) => word.toLowerCase());
 }
-
-/** The Lucide icon each known pill word carries, keyed by lowercase display word. */
-const PILL_ICONS: Record<string, string> = {
-  done: "Check",
-  passed: "Check",
-  pass: "Check",
-  complete: "Check",
-  completed: "Check",
-  ok: "Check",
-  verified: "Check",
-  ready: "Check",
-  observed: "Eye",
-  recommended: "Star",
-  fixed: "Wrench",
-  live: "Rocket",
-  shipped: "Rocket",
-  approved: "ThumbsUp",
-  merged: "GitMerge",
-  healthy: "Heart",
-  keep: "Pin",
-  failed: "X",
-  fail: "X",
-  failing: "X",
-  error: "X",
-  rejected: "X",
-  blocked: "Ban",
-  broken: "Unlink",
-  unsafe: "Shield",
-  safe: "Shield",
-  down: "ArrowDown",
-  "needs you": "User",
-  decision: "GitFork",
-  unverified: "CircleHelp",
-  "at risk": "TriangleAlert",
-  "in progress": "LoaderCircle",
-  pending: "Clock",
-  waiting: "Clock",
-  partial: "CircleDot",
-  skipped: "FastForward",
-  todo: "ClipboardList",
-  review: "Eye",
-  stale: "History",
-  draft: "Pencil",
-  inferred: "Lightbulb",
-  new: "Plus",
-  changed: "Pencil",
-  optional: "Circle",
-  "costs money": "CircleDollarSign",
-  destructive: "Trash2",
-  irreversible: "Lock",
-  brainstorm: "Lightbulb",
-  investigate: "Search",
-  preview: "Eye",
-  implement: "Wrench",
-  qualify: "FlaskConical",
-  owned: "User",
-  shared: "Users",
-  foreign: "Lock",
-};
-
-/** Words displayed as one canonical word, so the same state always reads the same. */
-const SYNONYMS: Record<string, string> = {
-  complete: "Done",
-  completed: "Done",
-  ok: "Done",
-  finished: "Done",
-  pass: "Passed",
-  fail: "Failed",
-  failing: "Failed",
-  error: "Failed",
-  waiting: "Pending",
-  "needs review": "Review",
-};
-
-/** The icon a heading or a line's leading bold label takes from its word. */
-const LABEL_ICONS: Record<string, string> = {
-  finding: "Search",
-  terminal: "Terminal",
-  folder: "Folder",
-  file: "File",
-  branch: "GitBranch",
-  review: "Eye",
-  ideas: "Lightbulb",
-  cause: "Zap",
-  fix: "Wrench",
-  risk: "TriangleAlert",
-  limits: "TriangleAlert",
-  next: "ArrowRight",
-  rollback: "Undo2",
-  undo: "Undo2",
-  options: "List",
-  result: "Flag",
-  why: "CircleHelp",
-  how: "Settings",
-  cost: "CircleDollarSign",
-  rule: "Gavel",
-  example: "Code",
-  checked: "Check",
-  pills: "Tag",
-  colors: "Palette",
-  icons: "Star",
-  scoreboard: "BarChart3",
-  verdict: "Gavel",
-  effect: "TrendingUp",
-  evidence: "Eye",
-  plan: "ClipboardList",
-  status: "Gauge",
-  decision: "GitFork",
-};
-
-/** Lead-in words naming the action a pill calls for; with a colon they icon anywhere in a line. */
-const ACTION_ICONS: Record<string, string> = {
-  check: "SquareCheck",
-  do: "ArrowRight",
-  next: "ArrowRight",
-  unblock: "Unlock",
-  left: "Ellipsis",
-  run: "Play",
-  guard: "Shield",
-  undo: "Undo2",
-  see: "ExternalLink",
-};
 
 const KNOWN = [
   ...new Set([
