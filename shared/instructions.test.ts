@@ -19,10 +19,6 @@ describe("buildFullInstructions", () => {
     for (const word of CONTEXT_WORDS) expect(text).toContain(`[[${word}]]`);
   });
 
-  it("credits pi-emphasis for the vocabulary", () => {
-    expect(text).toContain("pi-emphasis");
-  });
-
   it("teaches the combined workflow with generative ui blocks", () => {
     expect(text).toContain("```ui");
     expect(text).toContain("Generative UI plugin");

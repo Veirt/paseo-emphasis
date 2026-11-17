@@ -32,7 +32,7 @@ export default function contribute(client: PluginClientContext) {
   });
   client.addSettingsScreen({
     id: "preferences",
-    title: "pi-emphasis",
+    title: "Emphasis",
     icon: "Tag",
     Component: EmphasisSettingsScreen,
   });

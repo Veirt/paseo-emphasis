@@ -2,7 +2,7 @@
   "name": "paseo-emphasis",
   "version": "0.1.0",
   "private": true,
-  "description": "Paseo plugin that renders assistant replies with pi-emphasis markup: status pills, label icons, and colored emphasis.",
+  "description": "Paseo plugin that renders assistant replies with emphasis markup (status pills, label icons, colored emphasis) and teaches agents the format.",
   "license": "MIT",
   "files": [
     "paseo-plugin.json",

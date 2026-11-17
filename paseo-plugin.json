@@ -1,6 +1,7 @@
 {
   "id": "emphasis",
   "name": "Emphasis",
+  "description": "Renders agent replies written with emphasis markup as native Paseo UI: status pills, icon-headed labels, colored emphasis. Teaches agents the format through reply guidance.",
   "requirements": {
     "paseo": ">=0.16.0"
   }

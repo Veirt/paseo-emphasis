@@ -14,8 +14,7 @@ export const EMPHASIS_MARKER = "[paseo-emphasis]";
  * The reply format agents are taught in their system prompt at agent creation. It is derived
  * from research into how agent output meets a human attention window: the outcome first with
  * numbers on the chip, one scan order for reports, uncertainty surfaced, and detail on demand.
- * The pill vocabulary is pi-emphasis's (https://github.com/johnlindquist/pi-emphasis), which
- * this plugin renders as native UI; the word lists come straight from `VOCABULARY`.
+ * The word lists come straight from `VOCABULARY`.
  */
 export function buildFullInstructions(): string {
   return `${EMPHASIS_MARKER} reply-format guidance from the Emphasis plugin for Paseo.
@@ -62,7 +61,5 @@ or bold lead label gains an icon from its word, \`**bold**\` carries the accent 
   markup out of code, paths, commands, and exact output; write plain markdown when asked for
   plain text.
 
-Pill vocabulary and rendering ideas from pi-emphasis (github.com/johnlindquist/pi-emphasis);
-this guidance and its renderer are the Paseo GUI adaptation. Rich inline components follow
-the Generative UI plugin (github.com/anh-chu/paseo-plugin-genui) when it is enabled.`;
+Rich inline components follow the Generative UI plugin when it is enabled.`;
 }
