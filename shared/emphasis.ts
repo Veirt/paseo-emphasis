@@ -39,9 +39,23 @@ export const emphasisLineSchema = z.object({
   segments: z.array(emphasisSegmentSchema),
 });
 
+/** Column alignment from a GFM delimiter row's `:---` colons. */
+export const emphasisAlignSchema = z.enum(["left", "center", "right", "none"]);
+
+/** A GFM table: one segment-parsed line per cell data. */
+export const emphasisTableSchema = z.object({
+  /** One entry per column, from the delimiter row. */
+  aligns: z.array(emphasisAlignSchema),
+  /** The header row, parsed like any other line. */
+  header: z.array(emphasisLineSchema),
+  /** Body rows, each as long as `header` (padded or cut to fit). */
+  rows: z.array(z.array(emphasisLineSchema)),
+});
+
 export const emphasisBlockSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("markdown"), text: z.string() }),
   z.object({ type: z.literal("chunk"), lines: z.array(emphasisLineSchema) }),
+  z.object({ type: z.literal("table"), table: emphasisTableSchema }),
 ]);
 
 export const emphasisDataSchema = z.object({
@@ -52,6 +66,8 @@ export const emphasisDataSchema = z.object({
 });
 
 export type EmphasisTone = z.output<typeof emphasisToneSchema>;
+export type EmphasisAlign = z.output<typeof emphasisAlignSchema>;
+export type EmphasisTable = z.output<typeof emphasisTableSchema>;
 
 /** A gauge's data: how many of `total` units are filled. */
 export interface Gauge {

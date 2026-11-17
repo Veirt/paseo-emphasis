@@ -13,6 +13,7 @@ import {
   renderStepper,
   renderTree,
 } from "./emphasis-rows";
+import { EmphasisTable } from "./emphasis-table";
 
 /** Dispatches one chunk's planned lines: headings and structure rows to their renderers. */
 function renderChunkLines(lines: EmphasisLine[], kit: RenderKit, baseKey: number): ReactNode[] {
@@ -77,6 +78,10 @@ export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps
       {data.blocks.map((block, blockIndex) =>
         block.type === "markdown" ? (
           <Markdown key={blockIndex}>{block.text}</Markdown>
+        ) : block.type === "table" ? (
+          <View key={blockIndex}>
+            <EmphasisTable table={block.table} kit={kit} />
+          </View>
         ) : (
           <View key={blockIndex} style={kit.styles.chunk}>
             {renderChunkLines(block.lines, kit, blockIndex)}

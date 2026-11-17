@@ -167,24 +167,40 @@ describe("parseEmphasis block layout", () => {
     expect(data?.phase).toBe("streaming");
   });
 
-  test("keeps a table with pill markup whole in one markdown block", () => {
+  test("parses a table with pill markup into a table block with pill cells", () => {
     const source = [
       "| Module | State | Note |",
       "| --- | --- | --- |",
       "| parse | [[Done]] | gauge and tree tokens |",
     ].join("\n");
-    // Nothing left to decorate: the whole message, table with its literal cell
-    // markup included, goes back to the host renderer with its copy affordance.
-    expect(parseEmphasis(source, "complete")).toBeNull();
+    const data = parseEmphasis(source, "complete");
+    expect(() => emphasisDataSchema.parse(data)).not.toThrow();
+    expect(data?.blocks.map((block) => block.type)).toEqual(["table"]);
+    const block = data?.blocks[0];
+    const table = block?.type === "table" ? block.table : undefined;
+    expect(table?.header.map((cell) => cell.segments[0]?.type)).toEqual(["text", "text", "text"]);
+    expect(table?.rows[0]?.[1]?.segments).toEqual([
+      { type: "pill", label: "Done", tone: "success", icon: "Check" },
+    ]);
   });
 
-  test("renders a decorated table cell line as markdown, not a chunk", () => {
+  test("renders decorated table cells as pills inside a table block", () => {
     const source = "[[Done]] shipped\n\n| a | b |\n| --- | --- |\n| 1 | [[Needs you]] |";
     const data = parseEmphasis(source, "complete");
+    expect(data?.blocks.map((block) => block.type)).toEqual(["chunk", "table"]);
+    const block = data?.blocks[1];
+    const table = block?.type === "table" ? block.table : undefined;
+    expect(table?.rows[0]?.[1]?.segments).toEqual([
+      { type: "pill", label: "Needs you", tone: "warning", icon: "User" },
+    ]);
+  });
+
+  test("keeps a table-like line with no delimiter row as markdown", () => {
+    const source = "[[Done]] shipped\n\n| a | b | no delimiter row follows";
+    const data = parseEmphasis(source, "complete");
     expect(data?.blocks.map((block) => block.type)).toEqual(["chunk", "markdown"]);
-    const table = data?.blocks[1];
-    expect(table?.type === "markdown" && table.text.startsWith("| a | b |")).toBe(true);
-    expect(table?.type === "markdown" && table.text.includes("[[Needs you]]")).toBe(true);
+    const block = data?.blocks[1];
+    expect(block?.type === "markdown" && block.text.startsWith("| a | b |")).toBe(true);
   });
 });
 
