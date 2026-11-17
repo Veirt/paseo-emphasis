@@ -154,7 +154,7 @@ const ACTION_WORD = /(\p{L}+):$/u;
 
 function hasDecorations(line: string): boolean {
   if (HEADING.test(line)) return true;
-  return /\*\*|__|\[\[|→|[✓✔✗✘]|[├└]──/.test(line);
+  return /\*\*|__|\[\[|→|[✓✔✗✘]|[├└]──|[▰▱]/.test(line);
 }
 
 interface PillLabel {
@@ -188,7 +188,7 @@ function toneOf(key: string): EmphasisTone {
 }
 
 /** Escaped bold markers, bold markers, pills, marks, arrows, and tree connectors. */
-const INLINE_TOKEN = /(\\*)(\*\*|__|\[\[([^[\]\n]{1,32})\]\]|→|✓|✔|✗|✘|[├└]──)/g;
+const INLINE_TOKEN = /(\\*)(\*\*|__|\[\[([^[\]\n]{1,32})\]\]|→|✓|✔|✗|✘|[├└]──|[▰▱]{2,})/g;
 const STAR_BOLD = "**";
 const UNDERSCORE_BOLD = "__";
 
@@ -273,6 +273,12 @@ function parseLine(line: string): EmphasisLine {
         segments.push({ type: "mark", pass: true });
       } else if (marker === "✗" || marker === "✘") {
         segments.push({ type: "mark", pass: false });
+      } else if (marker.match(/[▰▱]/)) {
+        segments.push({
+          type: "gauge",
+          filled: (marker.match(/▰/g) ?? []).length,
+          total: marker.length,
+        });
       } else {
         segments.push({ type: "tree", text: marker });
       }
@@ -309,15 +315,13 @@ function leadPosition(segments: EmphasisSegment[], runStart: number): boolean {
 }
 
 function headingSegments(match: RegExpMatchArray): EmphasisSegment[] {
-  const [, indent, hashes, title] = match;
+  const [, , , title] = match;
   const trimmed = title.trim();
   const word = trimmed.replace(/[:\s]+$/, "").toLowerCase();
   const icon = LABEL_ICONS[word] ?? (trimmed.endsWith(":") ? ACTION_ICONS[word] : undefined);
-  // pi-emphasis shows the hash marks for levels deeper than two.
-  const marker = hashes.length > 2 ? `${"#".repeat(hashes.length)} ` : "";
   const segments: EmphasisSegment[] = [];
   if (icon) segments.push({ type: "icon", name: icon });
-  segments.push({ type: "text", text: `${indent}${marker}${trimmed}`, bold: true });
+  segments.push({ type: "text", text: trimmed, bold: true });
   return segments;
 }
 

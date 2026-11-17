@@ -26,6 +26,11 @@ export const emphasisSegmentSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("arrow") }),
   z.object({ type: z.literal("tree"), text: z.string() }),
   z.object({ type: z.literal("mark"), pass: z.boolean() }),
+  z.object({
+    type: z.literal("gauge"),
+    filled: z.number().int().min(0),
+    total: z.number().int().min(2),
+  }),
 ]);
 
 export const emphasisLineSchema = z.object({

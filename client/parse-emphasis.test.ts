@@ -128,18 +128,26 @@ describe("parseEmphasis labels and headings", () => {
     ]);
   });
 
-  test("keeps hash marks on headings deeper than two", () => {
+  test("strips hash marks on headings deeper than two", () => {
     const data = parseEmphasis("### Untitled", "complete");
     expect(data?.blocks).toEqual([
       {
         type: "chunk",
-        lines: [{ heading: 3, segments: [{ type: "text", text: "### Untitled", bold: true }] }],
+        lines: [{ heading: 3, segments: [{ type: "text", text: "Untitled", bold: true }] }],
       },
     ]);
   });
 });
 
 describe("parseEmphasis block layout", () => {
+  test("reads a gauge bar as structured data", () => {
+    const data = parseEmphasis("progress ▰▰▱▱▱", "complete");
+    expect(segmentsOf(data)).toEqual([
+      { type: "text", text: "progress ", bold: false },
+      { type: "gauge", filled: 2, total: 5 },
+    ]);
+  });
+
   test("returns null when nothing needs decorating", () => {
     expect(parseEmphasis("plain text\n\n- a\n- b", "complete")).toBeNull();
   });
