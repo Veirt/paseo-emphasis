@@ -35,10 +35,18 @@ type GaugeBlock = Extract<EmphasisBlock, { type: "gauge" }>;
 
 /** A section heading with its icon flush at the left margin (never indented past body text). */
 export const HeadingBlock = memo(
-  function HeadingBlock({ block, kit }: { block: HeadingBlock; kit: RenderKit }): ReactNode {
+  function HeadingBlock({
+    block,
+    kit,
+    isFirst,
+  }: {
+    block: HeadingBlock;
+    kit: RenderKit;
+    isFirst: boolean;
+  }): ReactNode {
     const size = headingSize(block.level, kit.compact);
     return (
-      <View style={kit.styles.headingRow}>
+      <View style={[kit.styles.headingRow, isFirst ? undefined : kit.styles.headingSpacing]}>
         <Icon
           name={block.icon}
           size={Math.min(Math.max(size - 4, 14), 19)}
@@ -53,7 +61,8 @@ export const HeadingBlock = memo(
       </View>
     );
   },
-  (prev, next) => prev.kit === next.kit && sameHeading(prev.block, next.block),
+  (prev, next) =>
+    prev.kit === next.kit && prev.isFirst === next.isFirst && sameHeading(prev.block, next.block),
 );
 
 /** A pill strip / scoreboard, optionally paired with short inline text or full-width `<Markdown>`. */
@@ -215,15 +224,30 @@ export const GaugeBlockView = memo(
   (prev, next) => prev.kit === next.kit && sameGaugeBlock(prev.block, next.block),
 );
 
+const TREE_RAIL_PREFIX = /^((?:[│|]\s*|\s+)*[├└]──\s*|(?:\s*[│|]\s*)+)(.*)$/;
+
 export const TreeBlock = memo(
   function TreeBlock({ lines, kit }: { lines: readonly string[]; kit: RenderKit }): ReactNode {
     return (
       <View style={kit.styles.codePanel}>
-        {lines.map((line, index) => (
-          <Text key={index} selectable style={kit.styles.codeLine}>
-            {line}
-          </Text>
-        ))}
+        {lines.map((line, index) => {
+          const match = line.match(TREE_RAIL_PREFIX);
+          const rail = match?.[1];
+          const label = match?.[2];
+          if (rail !== undefined && rail.length > 0 && label !== undefined) {
+            return (
+              <Text key={index} selectable style={kit.styles.codeLine}>
+                <Text style={kit.styles.treeRail}>{rail}</Text>
+                {label}
+              </Text>
+            );
+          }
+          return (
+            <Text key={index} selectable style={kit.styles.codeLine}>
+              {line}
+            </Text>
+          );
+        })}
       </View>
     );
   },

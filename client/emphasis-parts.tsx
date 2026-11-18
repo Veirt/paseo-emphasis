@@ -79,7 +79,14 @@ export function renderChip(chip: PillData, kit: RenderKit, key: number): ReactNo
       style={[kit.styles.pill, { backgroundColor: visual.background, borderColor: visual.border }]}
     >
       {chip.icon ? <Icon name={chip.icon} size={kit.iconSize} color={visual.foreground} /> : null}
-      <Text selectable style={[kit.styles.pillText, { color: visual.foreground }]}>
+      <Text
+        selectable
+        style={[
+          kit.styles.pillText,
+          tone === "danger" ? kit.styles.pillTextDanger : undefined,
+          { color: visual.foreground },
+        ]}
+      >
         {chip.label}
       </Text>
       {ratio ? (

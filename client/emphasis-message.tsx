@@ -21,7 +21,7 @@ function renderBlock(block: EmphasisBlock, kit: RenderKit, index: number): React
     case "markdown":
       return <MarkdownBlock key={key} text={block.text} />;
     case "heading":
-      return <HeadingBlock key={key} block={block} kit={kit} />;
+      return <HeadingBlock key={key} block={block} kit={kit} isFirst={index === 0} />;
     case "chips":
       return <ChipsBlock key={key} block={block} kit={kit} />;
     case "list":
@@ -121,15 +121,16 @@ export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps
   }, [data.text, toast]);
 
   return (
-    <View style={kit.styles.message}>
+    <View testID="assistant-message" style={kit.styles.message}>
       {data.blocks.map((block, index) => renderBlock(block, kit, index))}
       {data.phase === "complete" ? (
         <Pressable
           accessibilityLabel={copied ? "Copied message markdown" : "Copy message markdown"}
+          accessibilityHint="Copies original message markdown"
           accessibilityRole="button"
           hitSlop={8}
           onPress={handleCopy}
-          style={kit.styles.copyButton}
+          style={({ pressed }) => [kit.styles.copyButton, pressed ? { opacity: 0.45 } : undefined]}
         >
           <Icon name={copied ? "Check" : "Copy"} size={13} color={theme.colors.foregroundMuted} />
         </Pressable>

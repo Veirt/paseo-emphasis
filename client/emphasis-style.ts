@@ -35,12 +35,12 @@ export function tinted(color: string, alpha255: number): string {
 }
 
 /**
- * Urgency-calibrated pill colors:
+ * Urgency-calibrated pill colors inspired by Paseo's native `StatusBadge`:
  * - danger: solid fill (irreversible / costs money)
- * - error: clear red tint + strong border (broken / failed / blocked)
- * - warning: amber tint + crisp border (needs you / unverified)
- * - success: calm green tint + subtle border (done / passed / observed)
- * - action: soft accent tint + subtle border (Next / Do / Check / Fix)
+ * - error: red tint + danger border (broken / failed / blocked)
+ * - warning: calm amber tint + borderless (needs you / unverified)
+ * - success: calm green tint + borderless (done / passed / observed)
+ * - action: soft accent tint + borderless (Next / Do / Check / Fix)
  * - mode / owner / neutral: quiet surface2 chips so taxonomy never outshouts errors
  */
 export function toneVisual(tone: EmphasisTone, colors: ThemeColors): ToneVisual {
@@ -60,32 +60,32 @@ export function toneVisual(tone: EmphasisTone, colors: ThemeColors): ToneVisual 
       return { background: statusDanger, border: statusDanger, foreground: accentForeground };
     case "error":
       return {
-        background: tinted(statusDanger, 0x2b),
-        border: tinted(statusDanger, 0x70),
+        background: tinted(statusDanger, 0x28),
+        border: tinted(statusDanger, 0x58),
         foreground: statusDanger,
       };
     case "warning":
       return {
         background: tinted(statusWarning, 0x24),
-        border: tinted(statusWarning, 0x66),
+        border: "transparent",
         foreground: statusWarning,
       };
     case "success":
       return {
         background: tinted(statusSuccess, 0x20),
-        border: tinted(statusSuccess, 0x52),
+        border: "transparent",
         foreground: statusSuccess,
       };
     case "action":
       return {
         background: tinted(accent, 0x1e),
-        border: tinted(accent, 0x52),
+        border: "transparent",
         foreground: accent,
       };
     case "mode":
       return {
         background: surface2,
-        border: tinted(accent, 0x52),
+        border: tinted(accent, 0x44),
         foreground: accent,
       };
     case "owner":
@@ -147,9 +147,11 @@ interface EmphasisStyles {
   chipInlineRow: ViewStyle;
   pill: ViewStyle;
   pillText: TextStyle;
+  pillTextDanger: TextStyle;
   tag: ViewStyle;
   tagText: TextStyle;
   headingRow: ViewStyle;
+  headingSpacing: ViewStyle;
   headingText: TextStyle;
   list: ViewStyle;
   listRich: ViewStyle;
@@ -162,6 +164,7 @@ interface EmphasisStyles {
   gaugeRow: ViewStyle;
   codePanel: ViewStyle;
   codeLine: TextStyle;
+  treeRail: TextStyle;
   tableHeaderText: TextStyle;
   copyButton: ViewStyle;
 }
@@ -182,7 +185,7 @@ export function buildStyles(
   return {
     message: {
       gap: compact ? 8 : 10,
-      paddingVertical: compact ? 4 : 6,
+      paddingVertical: compact ? 6 : 8,
     },
     blockStack: {
       gap: compact ? 4 : 6,
@@ -205,13 +208,16 @@ export function buildStyles(
       gap: 5,
       borderRadius: 999,
       borderWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: compact ? 8 : 9,
-      paddingVertical: compact ? 2 : 3,
+      paddingHorizontal: compact ? 7 : 8,
+      paddingVertical: compact ? 1.5 : 2.5,
     },
     pillText: {
       fontSize: chipFontSize,
-      fontWeight: "600",
+      fontWeight: "500",
       fontVariant: ["tabular-nums"],
+    },
+    pillTextDanger: {
+      fontWeight: "600",
     },
     tag: {
       borderRadius: 6,
@@ -231,6 +237,8 @@ export function buildStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: compact ? 6 : 8,
+    },
+    headingSpacing: {
       marginTop: compact ? 4 : 6,
     },
     headingText: {
@@ -298,6 +306,9 @@ export function buildStyles(
       lineHeight: compact ? 17 : 19,
       fontFamily: monospaceFamily(platform),
       color: theme.foreground,
+    },
+    treeRail: {
+      color: theme.foregroundMuted,
     },
     tableHeaderText: {
       fontWeight: "600",

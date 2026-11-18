@@ -65,17 +65,23 @@ function expandElement(node: ReactNode): ReactNode {
       return expandElement(fn(node.props));
     }
   }
-  const { children } = readProps(node);
-  return { ...node, props: { ...readProps(node), children: expandElement(children) } };
+  const rawProps = readProps(node);
+  return { ...node, props: { ...rawProps, children: expandElement(rawProps.children) } };
 }
 
-function readProps(element: ReactElement): { style?: unknown; children?: ReactNode } {
+function readProps(element: ReactElement): {
+  style?: unknown;
+  testID?: string;
+  children?: ReactNode;
+} {
   const props = element.props;
   if (typeof props !== "object" || props === null) return {};
   const style = "style" in props ? props.style : undefined;
+  const rawTestID = "testID" in props ? props.testID : undefined;
   const children = "children" in props ? props.children : undefined;
   return {
     style,
+    testID: typeof rawTestID === "string" ? rawTestID : undefined,
     children:
       isValidElement(children) || Array.isArray(children) || typeof children === "string"
         ? (children as ReactNode) // SAFETY: validated React child or array/string from props
@@ -160,14 +166,29 @@ describe("EmphasisMessage", () => {
         }),
       );
 
+      const rootProps =
+        isValidElement(tree) && typeof tree.props === "object" && tree.props !== null
+          ? tree.props
+          : undefined;
+      expect(rootProps ? Reflect.get(rootProps, "testID") : undefined).toBe("assistant-message");
       const colors: Array<string | undefined> = [];
       flattenTextColors(tree, colors);
       expect(colors.length).toBeGreaterThan(0);
       expect(colors.every((color) => typeof color === "string" && color.length > 0)).toBe(true);
+      expect(colors).toContain(DARK_THEME.colors.foregroundMuted);
       expect(countElementType(tree, "Markdown")).toBe(3);
       expect(countElementType(tree, "StreamedText")).toBe(4);
     },
   );
+
+  test("aligns status pills with Paseo StatusBadge calm borders", async () => {
+    const { toneVisual } = await import("./emphasis-style");
+    expect(toneVisual("success", DARK_THEME.colors).border).toBe("transparent");
+    expect(toneVisual("warning", DARK_THEME.colors).border).toBe("transparent");
+    expect(toneVisual("action", DARK_THEME.colors).border).toBe("transparent");
+    expect(toneVisual("error", DARK_THEME.colors).border).not.toBe("transparent");
+    expect(toneVisual("neutral", DARK_THEME.colors).border).toBe(DARK_THEME.colors.border);
+  });
 
   test("memoized closed blocks skip re-render when an equal cloned block arrives while streaming", async () => {
     const { sameTable, sameList } = await import("./block-equal");
