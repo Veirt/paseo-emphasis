@@ -1,8 +1,8 @@
 import type { EmphasisTone } from "./emphasis";
 
 /**
- * Emphasis grammar, ported from pi-emphasis (https://github.com/johnlindquist/pi-emphasis).
- * `core` are the words agents are taught to write; `also` are accepted and colored the same.
+ * The emphasis grammar: `core` are the words agents are taught to write; `also`
+ * are accepted and colored the same.
  */
 export const VOCABULARY: Record<
   Exclude<EmphasisTone, "neutral">,

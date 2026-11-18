@@ -72,9 +72,9 @@ const UNDERSCORE_BOLD = "__";
 
 /**
  * Reads one prose line into segments. Code spans split the line and stay literal inside their
- * span; everything else follows pi-emphasis: bold runs keep their weight, pills become chips,
- * marks, arrows, and tree connectors are classified for coloring, and a heading or a sufficient
- * bold run gains an icon from its word.
+ * span; bold runs keep their weight, pills become chips, and marks, arrows, and tree
+ * connectors are classified for coloring. A heading, or a bold lead-in whose word is known,
+ * gains an icon.
  */
 export function parseLine(line: string): EmphasisLine {
   const headingMatch = line.match(HEADING);
