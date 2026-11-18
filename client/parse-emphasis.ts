@@ -1,4 +1,4 @@
-import type { EmphasisData, EmphasisBlock, EmphasisLine, EmphasisTable } from "../shared/emphasis";
+import type { EmphasisBlock, EmphasisData, EmphasisLine, EmphasisTable } from "../shared/emphasis";
 import { hasDecorations, parseLine } from "./parse-line";
 import { parseTableAt } from "./parse-table";
 
@@ -10,8 +10,8 @@ function isTableRow(line: string): boolean {
 }
 
 /**
- * The scanner's closed event set. One event per source line — except `table`,
- * which a lookahead consumes as a whole — carrying exactly the data its
+ * The scanner's closed event set, one per source line — except `table`, which
+ * a lookahead consumes as a whole. Each event carries exactly the data its
  * transition needs, so a new markdown construct is a compile error until some
  * transition handles it.
  */
@@ -25,35 +25,42 @@ type LineEvent =
   | { kind: "table"; table: EmphasisTable; next: number };
 
 /**
- * One scanner run: what was emitted, the two open accumulators, and the open
- * fence marker. `fence` gates which events the classifier can produce, so no
- * other combination of buffers can be invalid.
+ * The scanner's closed state set: which accumulator is open. The fence marker
+ * lives in the fenced state itself, so a fenced body line outside a fence, or
+ * a decorated line inside one, cannot be built — the classifier cannot name
+ * them and the transition table rejects them.
  */
-interface Reader {
-  blocks: EmphasisBlock[];
-  /** Verbatim source lines (plain prose or fenced code) pending a markdown block. */
-  markdown: string[];
-  /** Decorated lines pending a chunk block. */
-  chunk: EmphasisLine[];
-  fence: string | undefined;
+type ScanState =
+  | { kind: "empty" }
+  | { kind: "markdown-open"; lines: string[] }
+  | { kind: "chunk-open"; lines: EmphasisLine[] }
+  | { kind: "fence-open"; marker: string; lines: string[] };
+
+/** What one transition yields: the next state and the blocks it finishes. */
+interface Step {
+  state: ScanState;
+  emitted: EmphasisBlock[];
 }
 
-/** Opens the accumulated markdown block, unless it held only blank lines. */
-function flushMarkdown(reader: Reader): void {
-  if (reader.markdown.some((line) => line.trim().length > 0)) {
-    reader.blocks.push({
-      type: "markdown",
-      text: reader.markdown.join("\n").replace(/^\n+/, ""),
-    });
-  }
-  reader.markdown = [];
+/** A finished markdown block, or nothing when the run held only blank lines. */
+function markdownBlock(lines: string[]): EmphasisBlock[] {
+  if (!lines.some((line) => line.trim().length > 0)) return [];
+  return [{ type: "markdown", text: lines.join("\n").replace(/^\n+/, "") }];
 }
 
-/** Opens the accumulated chunk block, if any decorated lines are pending. */
-function flushChunk(reader: Reader): void {
-  if (reader.chunk.length === 0) return;
-  reader.blocks.push({ type: "chunk", lines: reader.chunk });
-  reader.chunk = [];
+function chunkBlock(lines: EmphasisLine[]): EmphasisBlock[] {
+  if (lines.length === 0) return [];
+  return [{ type: "chunk", lines }];
+}
+
+/** A state × event cell the classifier cannot produce: a bug, not a case to skip. */
+function unexpected(state: ScanState, event: LineEvent): never {
+  throw new Error(`scanner transition bug: ${event.kind} in ${state.kind}`);
+}
+
+/** Reaching this tail means an event kind was not handled: caught at compile time. */
+function unhandled(event: never): never {
+  throw new Error(`scanner event bug: ${JSON.stringify(event)}`);
 }
 
 /**
@@ -61,14 +68,14 @@ function flushChunk(reader: Reader): void {
  * lives here; it produces exactly one event for every line, so the transition
  * below never inspects raw text again.
  */
-function eventAt(lines: readonly string[], index: number, reader: Reader): LineEvent {
+function eventAt(lines: readonly string[], index: number, state: ScanState): LineEvent {
   const line = lines[index] ?? "";
-  if (reader.fence !== undefined) {
+  if (state.kind === "fence-open") {
     const close = line.match(FENCE_OPEN);
     if (
       close?.[1] !== undefined &&
-      close[1][0] === reader.fence[0] &&
-      close[1].length >= reader.fence.length
+      close[1][0] === state.marker[0] &&
+      close[1].length >= state.marker.length
     ) {
       return { kind: "fence-close", line };
     }
@@ -89,65 +96,135 @@ function eventAt(lines: readonly string[], index: number, reader: Reader): LineE
 }
 
 /**
- * The one transition: where each event's payload goes. Blank lines and fences
- * keep the markdown run open, decorated lines open a chunk, a table closes
- * both. Effect-free apart from these buffers, so scan order and flushing are
- * decided in exactly one place.
+ * The transition table: state × event → next state plus finished blocks.
+ * Pure — state and event in, new state and finished blocks out — so scan
+ * order and block boundaries are decided in exactly one place.
  */
-function transition(reader: Reader, event: LineEvent): void {
+function transition(state: ScanState, event: LineEvent): Step {
   switch (event.kind) {
     case "fence-open":
-      flushChunk(reader);
-      reader.fence = event.marker;
-      reader.markdown.push(event.line);
-      break;
+      if (state.kind === "empty") {
+        return {
+          state: { kind: "fence-open", marker: event.marker, lines: [event.line] },
+          emitted: [],
+        };
+      }
+      if (state.kind === "markdown-open") {
+        return {
+          state: { kind: "fence-open", marker: event.marker, lines: [...state.lines, event.line] },
+          emitted: [],
+        };
+      }
+      if (state.kind === "chunk-open") {
+        return {
+          state: { kind: "fence-open", marker: event.marker, lines: [event.line] },
+          emitted: chunkBlock(state.lines),
+        };
+      }
+      return unexpected(state, event);
     case "fence-body":
-      reader.markdown.push(event.line);
-      break;
+      if (state.kind === "fence-open") {
+        return { state: { ...state, lines: [...state.lines, event.line] }, emitted: [] };
+      }
+      return unexpected(state, event);
     case "fence-close":
-      reader.markdown.push(event.line);
-      reader.fence = undefined;
-      break;
+      if (state.kind === "fence-open") {
+        return {
+          state: { kind: "markdown-open", lines: [...state.lines, event.line] },
+          emitted: [],
+        };
+      }
+      return unexpected(state, event);
     case "blank":
-      flushChunk(reader);
-      reader.markdown.push(event.line);
-      break;
-    case "table":
-      flushChunk(reader);
-      flushMarkdown(reader);
-      reader.blocks.push({ type: "table", table: event.table });
-      break;
-    case "decorated":
-      flushMarkdown(reader);
-      reader.chunk.push(event.line);
-      break;
+      if (state.kind === "empty" || state.kind === "markdown-open") {
+        const lines = state.kind === "markdown-open" ? [...state.lines, event.line] : [];
+        return { state: { kind: "markdown-open", lines }, emitted: [] };
+      }
+      if (state.kind === "chunk-open") {
+        return {
+          state: { kind: "markdown-open", lines: [event.line] },
+          emitted: chunkBlock(state.lines),
+        };
+      }
+      return unexpected(state, event);
     case "prose":
-      flushChunk(reader);
-      reader.markdown.push(event.line);
-      break;
+      if (state.kind === "empty" || state.kind === "markdown-open") {
+        // From empty, the line opens the buffer: prose must never be dropped.
+        const lines = state.kind === "markdown-open" ? [...state.lines, event.line] : [event.line];
+        return { state: { kind: "markdown-open", lines }, emitted: [] };
+      }
+      if (state.kind === "chunk-open") {
+        return {
+          state: { kind: "markdown-open", lines: [event.line] },
+          emitted: chunkBlock(state.lines),
+        };
+      }
+      return unexpected(state, event);
+    case "decorated":
+      if (state.kind === "empty" || state.kind === "chunk-open") {
+        const lines = state.kind === "chunk-open" ? [...state.lines, event.line] : [event.line];
+        return { state: { kind: "chunk-open", lines }, emitted: [] };
+      }
+      if (state.kind === "markdown-open") {
+        return {
+          state: { kind: "chunk-open", lines: [event.line] },
+          emitted: markdownBlock(state.lines),
+        };
+      }
+      return unexpected(state, event);
+    case "table":
+      if (state.kind === "empty") {
+        return { state, emitted: [{ type: "table", table: event.table }] };
+      }
+      if (state.kind === "markdown-open") {
+        return {
+          state: { kind: "empty" },
+          emitted: [...markdownBlock(state.lines), { type: "table", table: event.table }],
+        };
+      }
+      if (state.kind === "chunk-open") {
+        return {
+          state: { kind: "empty" },
+          emitted: [...chunkBlock(state.lines), { type: "table", table: event.table }],
+        };
+      }
+      return unexpected(state, event);
   }
+  return unhandled(event);
+}
+
+/** Blocks still open at end of text; an unclosed fence flushes as markdown. */
+function finish(state: ScanState): EmphasisBlock[] {
+  if (state.kind === "markdown-open" || state.kind === "fence-open") {
+    return markdownBlock(state.lines);
+  }
+  return chunkBlock(state.kind === "chunk-open" ? state.lines : []);
 }
 
 /**
  * Parses assistant markdown into renderable blocks, or returns null when the message carries
  * nothing this plugin decorates, which keeps the built-in renderer and its copy affordance.
  *
- * Decorated lines become chunk blocks rendered by this plugin; GFM tables become table blocks
- * with segment-parsed cells; plain runs and fenced code stay markdown blocks for the host
- * renderer. Data is render-only: the original markdown travels in `text` so copying always
- * yields the source with `[[...]]` intact.
+ * The scanner below is an explicit state machine: the classifier (`eventAt`) turns each source
+ * line into one closed event, the transition table folds events into blocks, and `parseEmphasis`
+ * is the edge that runs the fold. Decorated lines become chunk blocks rendered by this plugin;
+ * GFM tables become table blocks with segment-parsed cells; plain runs and fenced code stay
+ * markdown blocks for the host renderer. Data is render-only: the original markdown travels in
+ * `text` so copying always yields the source with `[[...]]` intact.
  */
 export function parseEmphasis(markdown: string, phase: EmphasisData["phase"]): EmphasisData | null {
   const lines = markdown.split("\n");
-  const reader: Reader = { blocks: [], markdown: [], chunk: [], fence: undefined };
+  let state: ScanState = { kind: "empty" };
+  const blocks: EmphasisBlock[] = [];
   for (let index = 0; index < lines.length;) {
-    const event = eventAt(lines, index, reader);
-    transition(reader, event);
+    const event = eventAt(lines, index, state);
+    const step = transition(state, event);
+    blocks.push(...step.emitted);
+    state = step.state;
     index = event.kind === "table" ? event.next : index + 1;
   }
-  flushMarkdown(reader);
-  flushChunk(reader);
+  blocks.push(...finish(state));
 
-  if (reader.blocks.every((block) => block.type === "markdown")) return null;
-  return { text: markdown, phase, blocks: reader.blocks };
+  if (blocks.every((block) => block.type === "markdown")) return null;
+  return { text: markdown, phase, blocks };
 }
