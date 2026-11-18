@@ -1,14 +1,16 @@
 import { Icon, Markdown } from "@getpaseo/plugin/client/ui";
-import type { ReactNode } from "react";
+import { memo, type ReactNode, useMemo } from "react";
 import { ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import type {
   EmphasisAlign,
   EmphasisTable as EmphasisTableData,
   TableCell,
 } from "../shared/emphasis";
+import { sameTable } from "./block-equal";
 import { MiniBar, renderChip, renderShortInlineText } from "./emphasis-parts";
 import { renderStepperRow } from "./emphasis-rows";
 import { gaugeTone, markIcon, tinted, toneVisual, type RenderKit } from "./emphasis-style";
+import { isPlainProse } from "./parse-tokens";
 
 function cellWidth(cell: TableCell): number {
   switch (cell.kind) {
@@ -48,9 +50,12 @@ function rowAlignment(align: EmphasisAlign): ViewStyle | undefined {
   return undefined;
 }
 
-function renderMarkdownCell(text: string, isHeader: boolean): ReactNode {
+function renderMarkdownCell(text: string, isHeader: boolean, kit: RenderKit): ReactNode {
   const trimmed = text.trim();
   if (trimmed.length === 0) return null;
+  if (isPlainProse(trimmed)) {
+    return renderShortInlineText(trimmed, isHeader ? kit.styles.tableHeaderText : undefined);
+  }
   if (isHeader && !/[`[\]*_~<>]/.test(trimmed)) {
     return <Markdown>{`**${trimmed}**`}</Markdown>;
   }
@@ -70,7 +75,7 @@ function CellContent({
 }) {
   switch (cell.kind) {
     case "markdown":
-      return renderMarkdownCell(cell.text, isHeader);
+      return renderMarkdownCell(cell.text, isHeader, kit);
     case "stepper":
       return renderStepperRow(cell.steps, kit, "cell-stepper");
     case "gauge":
@@ -111,7 +116,7 @@ function CellContent({
         >
           {cell.chips.map((chip, index) => renderChip(chip, kit, index))}
           {cell.text ? (
-            !/[\n`[\]*_~<>]/.test(cell.text) ? (
+            isPlainProse(cell.text) ? (
               renderShortInlineText(cell.text)
             ) : (
               <Markdown>{cell.text}</Markdown>
@@ -134,57 +139,57 @@ function cellBox(weight: number, compact: boolean, align: EmphasisAlign): ViewSt
 }
 
 /** A decorated GFM table rendered with native chip/gauge/mark cells and `<Markdown>` prose cells. */
-export function EmphasisTable({
-  table,
-  kit,
-}: {
-  table: EmphasisTableData;
-  kit: RenderKit;
-}): ReactNode {
-  const { colors, compact } = kit;
-  const weights = columnWeights(table);
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={!compact}>
-      <View
-        style={{
-          minWidth: "100%",
-          borderRadius: 8,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-          overflow: "hidden",
-        }}
-      >
-        <View style={{ flexDirection: "row", backgroundColor: colors.surface2 }}>
-          {table.header.map((cell, index) => {
-            const align = table.aligns[index] ?? "none";
-            return (
-              <View key={index} style={cellBox(weights[index] ?? 6, compact, align)}>
-                <CellContent cell={cell} kit={kit} align={align} isHeader />
-              </View>
-            );
-          })}
-        </View>
-        {table.rows.map((row, rowIndex) => (
-          <View
-            key={rowIndex}
-            style={{
-              flexDirection: "row",
-              backgroundColor: rowIndex % 2 === 0 ? colors.surface0 : colors.surface1,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: colors.border,
-            }}
-          >
-            {row.map((cell, columnIndex) => {
-              const align = table.aligns[columnIndex] ?? "none";
+export const EmphasisTable = memo(
+  function EmphasisTable({ table, kit }: { table: EmphasisTableData; kit: RenderKit }): ReactNode {
+    const { colors, compact } = kit;
+    const weights = useMemo(() => columnWeights(table), [table]);
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={!compact}>
+        <View
+          style={{
+            minWidth: "100%",
+            borderRadius: 8,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.border,
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ flexDirection: "row", backgroundColor: colors.surface2 }}>
+            {table.header.map((cell, index) => {
+              const align = table.aligns[index] ?? "none";
               return (
-                <View key={columnIndex} style={cellBox(weights[columnIndex] ?? 6, compact, align)}>
-                  <CellContent cell={cell} kit={kit} align={align} isHeader={false} />
+                <View key={index} style={cellBox(weights[index] ?? 6, compact, align)}>
+                  <CellContent cell={cell} kit={kit} align={align} isHeader />
                 </View>
               );
             })}
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-}
+          {table.rows.map((row, rowIndex) => (
+            <View
+              key={rowIndex}
+              style={{
+                flexDirection: "row",
+                backgroundColor: rowIndex % 2 === 0 ? colors.surface0 : colors.surface1,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: colors.border,
+              }}
+            >
+              {row.map((cell, columnIndex) => {
+                const align = table.aligns[columnIndex] ?? "none";
+                return (
+                  <View
+                    key={columnIndex}
+                    style={cellBox(weights[columnIndex] ?? 6, compact, align)}
+                  >
+                    <CellContent cell={cell} kit={kit} align={align} isHeader={false} />
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  },
+  (prev, next) => prev.kit === next.kit && sameTable(prev.table, next.table),
+);

@@ -1,6 +1,6 @@
 import type { PluginTimelineItemProps } from "@getpaseo/plugin/client";
 import { StyleSheet, type TextStyle, type ViewStyle } from "react-native";
-import type { EmphasisData, EmphasisTone, GaugeData } from "../shared/emphasis";
+import type { EmphasisTone, GaugeData } from "../shared/emphasis";
 
 type ThemeColors = PluginTimelineItemProps["theme"]["colors"];
 type Platform = PluginTimelineItemProps["layout"]["platform"];
@@ -162,6 +162,7 @@ interface EmphasisStyles {
   gaugeRow: ViewStyle;
   codePanel: ViewStyle;
   codeLine: TextStyle;
+  tableHeaderText: TextStyle;
   copyButton: ViewStyle;
 }
 
@@ -169,7 +170,6 @@ export interface RenderKit {
   styles: EmphasisStyles;
   colors: ThemeColors;
   compact: boolean;
-  phase: EmphasisData["phase"];
   iconSize: number;
 }
 
@@ -298,6 +298,9 @@ export function buildStyles(
       lineHeight: compact ? 17 : 19,
       fontFamily: monospaceFamily(platform),
       color: theme.foreground,
+    },
+    tableHeaderText: {
+      fontWeight: "600",
     },
     copyButton: {
       alignSelf: "flex-start",

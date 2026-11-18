@@ -565,11 +565,24 @@ function transition(state: ScanState, event: LineEvent): { step: Step; normalize
   return unhandled(event);
 }
 
+const QUICK_TRIGGER_GLYPH = /(?:\[\[|→|[✓✔✗✘▰▱]|[├└]──)/;
+const QUICK_HEADING = /^ {0,3}#{1,6}\s/m;
+const QUICK_ACTION_COLON = /(?:\*\*|__)[A-Za-z]+(?::(?:\*\*|__)|(?:\*\*|__):)/;
+
+function mayHaveEmphasis(markdown: string): boolean {
+  return (
+    QUICK_TRIGGER_GLYPH.test(markdown) ||
+    QUICK_HEADING.test(markdown) ||
+    QUICK_ACTION_COLON.test(markdown)
+  );
+}
+
 /**
  * Parses assistant markdown into renderable blocks, or returns null when the message carries
  * nothing this plugin decorates (keeping Paseo's built-in `AssistantMessage` and turn footer).
  */
 export function parseEmphasis(markdown: string, phase: EmphasisData["phase"]): EmphasisData | null {
+  if (!mayHaveEmphasis(markdown)) return null;
   const lines = markdown.split("\n");
   let state: ScanState = { kind: "empty" };
   const blocks: EmphasisBlock[] = [];

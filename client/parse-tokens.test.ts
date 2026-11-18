@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   extractLeadPrefix,
+  isPlainProse,
+  isShortInlineBody,
   normalizeInlinePills,
   parseActionBadge,
   parseGaugePrefix,
@@ -124,6 +126,18 @@ describe("parseStepperLine & parseGaugePrefix", () => {
 
   test("maps fix into action badges", () => {
     expect(parseActionBadge("Fix")).toEqual({ label: "Fix", tone: "action", icon: "Wrench" });
+  });
+
+  test("keeps file paths, URLs, and forge refs out of the plain inline text fast path", () => {
+    expect(isPlainProse("Module")).toBe(true);
+    expect(isPlainProse("full suite green")).toBe(true);
+    expect(isPlainProse("v1.2.3 (4.5s)")).toBe(true);
+    expect(isPlainProse("src/auth.ts")).toBe(false);
+    expect(isPlainProse("parse-tokens.ts:42")).toBe(false);
+    expect(isPlainProse("https://example.com")).toBe(false);
+    expect(isPlainProse("see owner/repo#12")).toBe(false);
+    expect(isShortInlineBody("src/auth.ts", false, 1)).toBe(false);
+    expect(isShortInlineBody("full suite green", false, 1)).toBe(true);
   });
 });
 

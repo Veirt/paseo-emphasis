@@ -1,6 +1,6 @@
 import { Icon, Markdown, StreamedText } from "@getpaseo/plugin/client/ui";
-import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { memo, type ReactNode } from "react";
+import { Text, type TextStyle, View } from "react-native";
 import type { GaugeData, PillData, TagData } from "../shared/emphasis";
 import {
   ZERO_COUNT,
@@ -107,16 +107,23 @@ export function renderTag(tag: TagData, kit: RenderKit, key: string): ReactNode 
   );
 }
 
-/** Full-fidelity Paseo Markdown prose block. */
-export function renderMarkdownBody(text: string): ReactNode {
+/** Full-fidelity Paseo Markdown prose block, memoized on string identity across stream ticks. */
+export const MarkdownBlock = memo(function MarkdownBlock({ text }: { text: string }) {
   const trimmed = text.trim();
   if (trimmed.length === 0) return null;
   return <Markdown>{trimmed}</Markdown>;
+});
+
+/** Full-fidelity Paseo Markdown prose block helper for nested block bodies. */
+export function renderMarkdownBody(text: string): ReactNode {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  return <MarkdownBlock text={trimmed} />;
 }
 
 /** Single-line plain prose matching Paseo's UI font and line height without wrapping lag. */
-export function renderShortInlineText(text: string): ReactNode {
-  return <StreamedText text={text} phase="complete" selectable />;
+export function renderShortInlineText(text: string, style?: TextStyle): ReactNode {
+  return <StreamedText text={text} phase="complete" selectable style={style} />;
 }
 
 /** A list marker or status mark rendered in the 20px list gutter. */

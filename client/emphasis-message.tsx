@@ -1,15 +1,16 @@
 import type { PluginTimelineItemProps } from "@getpaseo/plugin/client";
-import { Icon, Markdown, copyText, useToast } from "@getpaseo/plugin/client/ui";
+import { Icon, copyText, useToast } from "@getpaseo/plugin/client/ui";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
-import { emphasisDataSchema, type EmphasisBlock, type EmphasisData } from "../shared/emphasis";
+import type { EmphasisBlock, EmphasisData } from "../shared/emphasis";
+import { MarkdownBlock } from "./emphasis-parts";
 import {
-  renderChipsBlock,
-  renderGaugeBlock,
-  renderHeadingBlock,
-  renderListBlock,
-  renderStepperRow,
-  renderTreeBlock,
+  ChipsBlock,
+  GaugeBlockView,
+  HeadingBlock,
+  ListBlock,
+  StepperBlock,
+  TreeBlock,
 } from "./emphasis-rows";
 import { buildStyles, type RenderKit } from "./emphasis-style";
 import { EmphasisTable } from "./emphasis-table";
@@ -18,19 +19,19 @@ function renderBlock(block: EmphasisBlock, kit: RenderKit, index: number): React
   const key = String(index);
   switch (block.type) {
     case "markdown":
-      return <Markdown key={key}>{block.text}</Markdown>;
+      return <MarkdownBlock key={key} text={block.text} />;
     case "heading":
-      return renderHeadingBlock(block, kit, key);
+      return <HeadingBlock key={key} block={block} kit={kit} />;
     case "chips":
-      return renderChipsBlock(block, kit, key);
+      return <ChipsBlock key={key} block={block} kit={kit} />;
     case "list":
-      return renderListBlock(block, kit, key);
+      return <ListBlock key={key} block={block} kit={kit} />;
     case "stepper":
-      return renderStepperRow(block.steps, kit, key);
+      return <StepperBlock key={key} steps={block.steps} kit={kit} />;
     case "gauge":
-      return renderGaugeBlock(block, kit, key);
+      return <GaugeBlockView key={key} block={block} kit={kit} />;
     case "tree":
-      return renderTreeBlock(block.lines, kit, key);
+      return <TreeBlock key={key} lines={block.lines} kit={kit} />;
     case "table":
       return <EmphasisTable key={key} table={block.table} kit={kit} />;
   }
@@ -42,7 +43,8 @@ function renderBlock(block: EmphasisBlock, kit: RenderKit, index: number): React
  * action badges, steppers, gauges, trees, and decorated tables render natively.
  */
 export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps<EmphasisData>) {
-  const data = emphasisDataSchema.parse(item.data);
+  // The Paseo host (`PluginTimelineItemView`) validates `item.data` with `emphasisDataSchema` before render.
+  const data = item.data;
   const toast = useToast();
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,16 +55,54 @@ export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps
     };
   }, []);
 
-  const kit = useMemo<RenderKit>(
-    () => ({
-      styles: buildStyles(theme.colors, layout.compact, layout.platform),
-      colors: theme.colors,
+  const {
+    surface0,
+    surface1,
+    surface2,
+    border,
+    foreground,
+    foregroundMuted,
+    accent,
+    accentForeground,
+    statusSuccess,
+    statusWarning,
+    statusDanger,
+  } = theme.colors;
+  const kit = useMemo<RenderKit>(() => {
+    const colors = {
+      surface0,
+      surface1,
+      surface2,
+      border,
+      foreground,
+      foregroundMuted,
+      accent,
+      accentForeground,
+      statusSuccess,
+      statusWarning,
+      statusDanger,
+    };
+    return {
+      styles: buildStyles(colors, layout.compact, layout.platform),
+      colors,
       compact: layout.compact,
-      phase: data.phase,
       iconSize: layout.compact ? 12 : 13,
-    }),
-    [theme, layout, data.phase],
-  );
+    };
+  }, [
+    surface0,
+    surface1,
+    surface2,
+    border,
+    foreground,
+    foregroundMuted,
+    accent,
+    accentForeground,
+    statusSuccess,
+    statusWarning,
+    statusDanger,
+    layout.compact,
+    layout.platform,
+  ]);
 
   const handleCopy = useCallback(() => {
     copyText(data.text)

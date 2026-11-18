@@ -57,6 +57,14 @@ function expandElement(node: ReactNode): ReactNode {
     const fn = node.type as (props: unknown) => ReactNode; // SAFETY: React function component element
     return expandElement(fn(node.props));
   }
+  const elementType: unknown = node.type;
+  if (typeof elementType === "object" && elementType !== null && "type" in elementType) {
+    const inner: unknown = Reflect.get(elementType, "type");
+    if (typeof inner === "function") {
+      const fn = inner as (props: unknown) => ReactNode; // SAFETY: React.memo component wrapper
+      return expandElement(fn(node.props));
+    }
+  }
   const { children } = readProps(node);
   return { ...node, props: { ...readProps(node), children: expandElement(children) } };
 }
@@ -97,13 +105,15 @@ function flattenTextColors(node: ReactNode, out: Array<string | undefined>): voi
   flattenTextColors(children, out);
 }
 
-function collectMarkdownCount(node: ReactNode): number {
+function countElementType(node: ReactNode, type: string): number {
   if (node === null || node === undefined || typeof node !== "object") return 0;
-  if (Array.isArray(node)) return node.reduce((sum, child) => sum + collectMarkdownCount(child), 0);
+  if (Array.isArray(node)) {
+    return node.reduce((sum, child) => sum + countElementType(child, type), 0);
+  }
   if (!isValidElement(node)) return 0;
   const { children } = readProps(node);
-  const self = node.type === "Markdown" ? 1 : 0;
-  return self + collectMarkdownCount(children);
+  const self = node.type === type ? 1 : 0;
+  return self + countElementType(children, type);
 }
 
 describe("EmphasisMessage", () => {
@@ -154,7 +164,41 @@ describe("EmphasisMessage", () => {
       flattenTextColors(tree, colors);
       expect(colors.length).toBeGreaterThan(0);
       expect(colors.every((color) => typeof color === "string" && color.length > 0)).toBe(true);
-      expect(collectMarkdownCount(tree)).toBeGreaterThanOrEqual(5);
+      expect(countElementType(tree, "Markdown")).toBe(3);
+      expect(countElementType(tree, "StreamedText")).toBe(4);
     },
   );
+
+  test("memoized closed blocks skip re-render when an equal cloned block arrives while streaming", async () => {
+    const { sameTable, sameList } = await import("./block-equal");
+    const source = [
+      "- [[Broken]] **Lost structure**",
+      "  - detail line",
+      "",
+      "| Module | State |",
+      "| --- | :---: |",
+      "| [parse.ts](file:///repo/parse.ts) | [[Passed 12/12]] |",
+    ].join("\n");
+    const first = parseEmphasis(source, "streaming");
+    const second = parseEmphasis(`${source}\n\nTrailing streaming chunk`, "streaming");
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    if (!first || !second) return;
+
+    const firstList = first.blocks[0];
+    const secondList = second.blocks[0];
+    const firstTable = first.blocks[1];
+    const secondTable = second.blocks[1];
+    expect(firstList?.type === "list" && secondList?.type === "list").toBe(true);
+    expect(firstTable?.type === "table" && secondTable?.type === "table").toBe(true);
+    if (
+      firstList?.type === "list" &&
+      secondList?.type === "list" &&
+      firstTable?.type === "table" &&
+      secondTable?.type === "table"
+    ) {
+      expect(sameList(firstList, secondList)).toBe(true);
+      expect(sameTable(firstTable.table, secondTable.table)).toBe(true);
+    }
+  });
 });

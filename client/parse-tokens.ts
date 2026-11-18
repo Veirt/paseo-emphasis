@@ -383,10 +383,23 @@ function findClosingTicks(text: string, from: number, length: number): number {
   return -1;
 }
 
+const LINK_LIKE_TOKEN =
+  /https?:\/\/|www\.|\/|\\|\.[A-Za-z][A-Za-z0-9]{0,7}(?:$|[\s:)#,;])|(?:^|\s)#\d/;
+
+/** True when `text` could be autolinked by Paseo Markdown (URL, file path, extension, or `#issue`). */
+export function hasLinkLikeToken(text: string): boolean {
+  return LINK_LIKE_TOKEN.test(text);
+}
+
+/** True when single-line prose has no Markdown syntax, links, or file paths. */
+export function isPlainProse(text: string): boolean {
+  if (text.length === 0 || /[\n`[\]*_~<>\\]/.test(text)) return false;
+  return !hasLinkLikeToken(text);
+}
+
 /** True when a short single-line tail can safely share a baseline row with one leading chip. */
 export function isShortInlineBody(body: string, hasTag: boolean, chipCount: number): boolean {
   if (hasTag || chipCount !== 1) return false;
-  if (body.length === 0 || body.length > 44) return false;
-  if (/[\n`[\]*_~<>]/.test(body)) return false;
-  return true;
+  if (body.length > 44) return false;
+  return isPlainProse(body);
 }
