@@ -52,3 +52,5 @@ bun run format
 ## Credits
 
 - [pi-emphasis](https://github.com/johnlindquist/pi-emphasis) by John Lindquist (MIT): the pill idea and the reply-guidance approach.
+
+- [paseo-plugin-genui](https://github.com/anh-chu/paseo-plugin-genui): the reference for Paseo's guidance-at-creation, settings, and slash-command patterns. Use genui for rich generative answers (charts, forms, maps); this plugin keeps replies lightweight and text-safe.
