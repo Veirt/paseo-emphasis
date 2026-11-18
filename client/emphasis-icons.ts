@@ -62,13 +62,16 @@ export const PILL_ICONS: Record<string, string> = {
   foreign: "Lock",
 };
 
-/** The icon a heading or a line's leading bold label takes from its word. */
+/** The icon a heading takes from its word. */
 export const LABEL_ICONS: Record<string, string> = {
   finding: "Search",
+  findings: "Search",
   terminal: "Terminal",
   folder: "Folder",
   file: "File",
+  files: "Folder",
   branch: "GitBranch",
+  pipeline: "GitBranch",
   review: "Eye",
   ideas: "Lightbulb",
   cause: "Zap",
@@ -95,14 +98,16 @@ export const LABEL_ICONS: Record<string, string> = {
   evidence: "Eye",
   plan: "ClipboardList",
   status: "Gauge",
+  progress: "Gauge",
   decision: "GitFork",
 };
 
-/** Lead-in words naming the action a pill calls for; with a colon they icon anywhere in a line. */
+/** Lead-in words naming an explicit action or ask; rendered as calm action badges when leading a block. */
 export const ACTION_ICONS: Record<string, string> = {
   check: "SquareCheck",
   do: "ArrowRight",
   next: "ArrowRight",
+  fix: "Wrench",
   unblock: "Unlock",
   left: "Ellipsis",
   run: "Play",

@@ -1,16 +1,16 @@
-import { Icon, StreamedText } from "@getpaseo/plugin/client/ui";
-import type { ReactNode } from "react";
-import { Fragment } from "react";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { Fragment, type ReactNode } from "react";
 import { Text, View } from "react-native";
-import type { EmphasisLine } from "../shared/emphasis";
+import type { EmphasisBlock, ListItem, StepData } from "../shared/emphasis";
 import {
-  emphasisLineText,
-  type GaugeLayout,
-  type RowLayout,
-  type StepperLayout,
-} from "./emphasis-layout";
+  MiniBar,
+  renderChip,
+  renderListMarker,
+  renderMarkdownBody,
+  renderShortInlineText,
+  renderTag,
+} from "./emphasis-parts";
 import {
-  GUTTER,
   gaugeTone,
   headingSize,
   markIcon,
@@ -18,176 +18,187 @@ import {
   toneVisual,
   type RenderKit,
 } from "./emphasis-style";
-import { MiniBar, renderChip, renderGutterMarker, renderInlineSegment } from "./emphasis-parts";
+
+type HeadingBlock = Extract<EmphasisBlock, { type: "heading" }>;
+type ChipsBlock = Extract<EmphasisBlock, { type: "chips" }>;
+type ListBlock = Extract<EmphasisBlock, { type: "list" }>;
+type GaugeBlock = Extract<EmphasisBlock, { type: "gauge" }>;
+
+/** A section heading with its icon flush at the left margin (never indented past body text). */
+export function renderHeadingBlock(block: HeadingBlock, kit: RenderKit, key: string): ReactNode {
+  const size = headingSize(block.level, kit.compact);
+  return (
+    <View key={key} style={kit.styles.headingRow}>
+      <Icon
+        name={block.icon}
+        size={Math.min(Math.max(size - 4, 14), 19)}
+        color={kit.colors.foregroundMuted}
+      />
+      <Text
+        selectable
+        style={[kit.styles.headingText, { fontSize: size, lineHeight: Math.round(size * 1.3) }]}
+      >
+        {block.title}
+      </Text>
+    </View>
+  );
+}
+
+/** A pill strip / scoreboard, optionally paired with short inline text or full-width `<Markdown>`. */
+export function renderChipsBlock(block: ChipsBlock, kit: RenderKit, key: string): ReactNode {
+  if (block.inline && block.body !== undefined) {
+    return (
+      <View key={key} style={kit.styles.chipInlineRow}>
+        {block.chips.map((chip, index) => renderChip(chip, kit, index))}
+        {renderShortInlineText(block.body)}
+      </View>
+    );
+  }
+
+  return (
+    <View key={key} style={kit.styles.blockStack}>
+      <View style={kit.styles.chipStrip}>
+        {block.tag ? renderTag(block.tag, kit, "tag") : null}
+        {block.chips.map((chip, index) => renderChip(chip, kit, index))}
+      </View>
+      {block.body !== undefined ? renderMarkdownBody(block.body) : null}
+    </View>
+  );
+}
+
+function isShortStatusListItem(item: ListItem, compact: boolean): boolean {
+  if (item.tag !== undefined || item.chips.length !== 1) return false;
+  if (item.body.length === 0 || item.body.length > (compact ? 26 : 42)) return false;
+  return !/[\n`[\]*_~<>]/.test(item.body);
+}
 
 /**
- * A tree run rendered as one monospace panel: literal glyphs and paths on a
- * tinted surface, so a tree scans as source, not as prose with drawn rails.
+ * Renders a list containing pill/action items with uniform marker alignment and
+ * full-width `<Markdown>` inside each item, eliminating column crushing and bullet zig-zag.
  */
-export function renderTreePanel(lines: EmphasisLine[], kit: RenderKit, key: string): ReactNode {
+export function renderListBlock(block: ListBlock, kit: RenderKit, key: string): ReactNode {
+  const allShortSingleChip =
+    block.omitMarkers && block.items.every((item) => isShortStatusListItem(item, kit.compact));
+  const hasNestedOrMultiLine = block.items.some((item) => item.body.includes("\n"));
+
+  return (
+    <View key={key} style={hasNestedOrMultiLine ? kit.styles.listRich : kit.styles.list}>
+      {block.items.map((item, index) => {
+        const hasHeader = item.chips.length > 0 || item.tag !== undefined;
+        return (
+          <View key={index} style={kit.styles.listRow}>
+            {block.omitMarkers ? null : (
+              <View style={kit.styles.listGutter}>
+                {renderListMarker(block.ordered, item.markerLabel, item.leadMark, kit)}
+              </View>
+            )}
+            <View style={kit.styles.listContent}>
+              {allShortSingleChip ? (
+                <View style={kit.styles.chipInlineRow}>
+                  {item.chips.map((chip, chipIndex) => renderChip(chip, kit, chipIndex))}
+                  {renderShortInlineText(item.body)}
+                </View>
+              ) : (
+                <>
+                  {hasHeader ? (
+                    <View style={kit.styles.chipStrip}>
+                      {item.tag ? renderTag(item.tag, kit, "tag") : null}
+                      {item.chips.map((chip, chipIndex) => renderChip(chip, kit, chipIndex))}
+                    </View>
+                  ) : null}
+                  {renderMarkdownBody(item.body)}
+                </>
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Chips joined by same-scale chevrons, replacing `→` glyphs between pipeline steps. */
+export function renderStepperRow(
+  steps: readonly StepData[],
+  kit: RenderKit,
+  key: string,
+): ReactNode {
+  const { styles, colors, iconSize } = kit;
+  return (
+    <View key={key} style={styles.stepperRow}>
+      {steps.map((step, index) => {
+        const chip = renderChip(
+          {
+            label: step.label,
+            tone: step.pass !== undefined ? (step.pass ? "success" : "error") : step.tone,
+            icon: step.pass !== undefined ? markIcon(step.pass) : step.icon,
+          },
+          kit,
+          index,
+        );
+        const chevron =
+          index < steps.length - 1 ? (
+            <Icon
+              key={`chevron-${index}`}
+              name="ChevronRight"
+              size={iconSize}
+              color={colors.foregroundMuted}
+            />
+          ) : null;
+        return (
+          <Fragment key={index}>
+            {chip}
+            {chevron}
+          </Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+export function renderGaugeBlock(block: GaugeBlock, kit: RenderKit, key: string): ReactNode {
+  const { styles, colors } = kit;
+  const bar = (
+    <MiniBar
+      gauge={block.gauge}
+      width={60}
+      height={6}
+      color={toneVisual(gaugeTone(block.gauge), colors).foreground}
+      track={tinted(colors.foreground, 0x1f)}
+      maxSegments={12}
+    />
+  );
+  if (block.body === undefined || block.body.length === 0) {
+    return (
+      <View key={key} style={styles.gaugeRow}>
+        {bar}
+      </View>
+    );
+  }
+  if (!/[\n`[\]*_~<>]/.test(block.body) && block.body.length <= 44) {
+    return (
+      <View key={key} style={styles.gaugeRow}>
+        {bar}
+        {renderShortInlineText(block.body)}
+      </View>
+    );
+  }
+  return (
+    <View key={key} style={styles.blockStack}>
+      <View style={styles.gaugeRow}>{bar}</View>
+      {renderMarkdownBody(block.body)}
+    </View>
+  );
+}
+
+export function renderTreeBlock(lines: readonly string[], kit: RenderKit, key: string): ReactNode {
   return (
     <View key={key} style={kit.styles.codePanel}>
       {lines.map((line, index) => (
         <Text key={index} selectable style={kit.styles.codeLine}>
-          {emphasisLineText(line)}
+          {line}
         </Text>
       ))}
-    </View>
-  );
-}
-
-function rowHasNoLead(row: RowLayout): boolean {
-  return row.leadBadge === undefined && row.leadMark === undefined && row.marker === undefined;
-}
-
-export function renderRow(layout: RowLayout, kit: RenderKit, key: string): ReactNode {
-  const { styles, colors } = kit;
-  const badge = layout.leadBadge;
-  const badgeVisual = toneVisual("mode", colors);
-  // Chip-led rows keep no gutter marker: the chip is the marker.
-  const chipLead =
-    rowHasNoLead(layout) && layout.chips.length > 0 && layout.labelText === undefined;
-  const callout = ((badge !== undefined || layout.leadMark !== undefined) && !layout.marker) as
-    | boolean
-    | undefined;
-  const labelSpans = badge !== undefined || layout.labelText !== undefined;
-  return (
-    <View key={key} style={[styles.row, callout ? styles.callout : null]}>
-      {chipLead ? null : (
-        <View style={[styles.gutter, callout ? { width: GUTTER - 2 } : null]}>
-          {renderGutterMarker(layout.marker, undefined, layout.leadMark, kit)}
-        </View>
-      )}
-      <View style={[styles.content, { alignItems: labelSpans ? "flex-start" : "center" }]}>
-        {badge !== undefined ? (
-          <View style={[styles.pill, { backgroundColor: badgeVisual.background }]}>
-            <Icon name={badge.icon} size={kit.fontSize - 1} color={badgeVisual.foreground} />
-            {badge.word !== undefined ? (
-              <Text selectable style={[styles.pillText, { color: badgeVisual.foreground }]}>
-                {badge.word}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-        {layout.labelText ? (
-          <Text selectable style={styles.leadLabel}>
-            {layout.labelText}
-          </Text>
-        ) : null}
-        {layout.chips.map((chip, index) => renderChip(chip, kit, index))}
-        {layout.gauge !== undefined ? (
-          <MiniBar
-            gauge={layout.gauge}
-            width={44}
-            height={6}
-            color={toneVisual(gaugeTone(layout.gauge), kit.colors).foreground}
-            track={tinted(kit.colors.foreground, 0x1f)}
-            maxSegments={12}
-          />
-        ) : null}
-        {layout.rest && layout.rest.length > 0 ? (
-          <Text selectable style={[styles.line, styles.leadRest]}>
-            {layout.rest.map((segment, index) => renderInlineSegment(segment, kit, index))}
-          </Text>
-        ) : null}
-        {layout.trailingMark ? (
-          <View style={{ marginLeft: 2 }}>
-            <Icon
-              name={markIcon(layout.trailingMark.pass)}
-              size={kit.fontSize - 1}
-              color={layout.trailingMark.pass ? kit.colors.statusSuccess : kit.colors.statusDanger}
-            />
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-/** Chips joined by same-scale chevrons, replacing the → glyph between steps. */
-export function renderStepper(layout: StepperLayout, kit: RenderKit, key: string): ReactNode {
-  const { styles, colors, fontSize } = kit;
-  return (
-    <View key={key} style={styles.row}>
-      {layout.marker ? (
-        <View style={styles.gutter}>
-          {renderGutterMarker(layout.marker, undefined, undefined, kit)}
-        </View>
-      ) : null}
-      <View style={styles.stepperRow}>
-        {layout.steps.map((step, index) => {
-          const chip = renderChip(
-            {
-              label: step.label,
-              tone: step.mark ? (step.mark.pass ? "success" : "error") : step.tone,
-              icon: step.mark !== undefined ? markIcon(step.mark.pass) : step.icon,
-            },
-            kit,
-            index,
-          );
-          const chevron =
-            index < layout.steps.length - 1 ? (
-              <Icon
-                key={`chevron-${index}`}
-                name="ChevronRight"
-                size={fontSize - 2}
-                color={colors.foregroundMuted}
-              />
-            ) : null;
-          return (
-            <Fragment key={index}>
-              {chip}
-              {chevron}
-            </Fragment>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-export function renderGaugeRow(layout: GaugeLayout, kit: RenderKit, key: string): ReactNode {
-  const { styles, colors } = kit;
-  return (
-    <View key={key} style={styles.row}>
-      {kit.gutterMode ? <View style={styles.gutter} /> : null}
-      <MiniBar
-        gauge={layout.gauge}
-        width={56}
-        height={6}
-        color={toneVisual(gaugeTone(layout.gauge), colors).foreground}
-        track={tinted(colors.foreground, 0x1f)}
-        maxSegments={12}
-      />
-      {layout.rest && layout.rest.length > 0 ? (
-        <Text selectable style={[styles.line, styles.leadRest]}>
-          {layout.rest.map((segment, index) => renderInlineSegment(segment, kit, index))}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-/** A section heading: the icon hangs in the gutter so text meets the body column. */
-export function renderHeading(line: EmphasisLine, kit: RenderKit, key: string): ReactNode {
-  const { styles, colors, compact } = kit;
-  const size = headingSize(line.heading ?? 1, compact);
-  const icon = line.segments[0];
-  const title = icon?.type === "icon" ? line.segments[1] : icon;
-  const text = title?.type === "text" ? title.text : "";
-  return (
-    <View key={key} style={styles.sectionRow}>
-      <View style={styles.gutter}>
-        {icon?.type === "icon" ? (
-          <Icon name={icon.name} size={Math.min(size - 3, 18)} color={colors.foregroundMuted} />
-        ) : null}
-      </View>
-      <StreamedText
-        text={text}
-        phase={kit.phase}
-        selectable
-        style={[kit.styles.line, { fontSize: size, fontWeight: "600", flex: 1 }]}
-      />
     </View>
   );
 }

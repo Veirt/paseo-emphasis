@@ -1,68 +1,57 @@
 import type { PluginTimelineItemProps } from "@getpaseo/plugin/client";
 import { Icon, Markdown, copyText, useToast } from "@getpaseo/plugin/client/ui";
-import { type ReactNode, useCallback, useMemo } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
-import { emphasisDataSchema, type EmphasisData, type EmphasisLine } from "../shared/emphasis";
-import { groupTreeEntries, planLineLayout, type PlannedLine } from "./emphasis-layout";
-import { buildStyles, type RenderKit } from "./emphasis-style";
-import { renderInlineLine } from "./emphasis-parts";
+import { emphasisDataSchema, type EmphasisBlock, type EmphasisData } from "../shared/emphasis";
 import {
-  renderGaugeRow,
-  renderHeading,
-  renderRow,
-  renderStepper,
-  renderTreePanel,
+  renderChipsBlock,
+  renderGaugeBlock,
+  renderHeadingBlock,
+  renderListBlock,
+  renderStepperRow,
+  renderTreeBlock,
 } from "./emphasis-rows";
+import { buildStyles, type RenderKit } from "./emphasis-style";
 import { EmphasisTable } from "./emphasis-table";
 
-/** Dispatches one chunk's planned lines: headings and structure rows to their renderers. */
-function renderChunkLines(lines: EmphasisLine[], kit: RenderKit, baseKey: number): ReactNode[] {
-  const planned: PlannedLine[] = lines.map((line, index) => ({
-    line,
-    index,
-    layout: line.heading === undefined ? planLineLayout(line.segments) : undefined,
-  }));
-  const gutterMode = planned.some(
-    (entry) => entry.layout === undefined || entry.layout.type !== "inline",
-  );
-  const chunkKit: RenderKit = { ...kit, gutterMode };
-  return groupTreeEntries(planned).map((group) => {
-    if (group.kind === "tree-run") {
-      const first = group.entries[0];
-      return renderTreePanel(
-        group.entries.map((entry) => entry.line),
-        chunkKit,
-        `${baseKey}-tree-${first === undefined ? 0 : first.index}`,
-      );
-    }
-    const { entry } = group;
-    if (group.kind === "heading" || entry.layout === undefined) {
-      return renderHeading(entry.line, chunkKit, `${baseKey}-${entry.index}`);
-    }
-    const key = `${baseKey}-${entry.index}`;
-    switch (entry.layout.type) {
-      case "row":
-        return renderRow(entry.layout, chunkKit, key);
-      case "tree":
-        return renderTreePanel([entry.line], chunkKit, key);
-      case "stepper":
-        return renderStepper(entry.layout, chunkKit, key);
-      case "gauge-row":
-        return renderGaugeRow(entry.layout, chunkKit, key);
-      case "inline":
-        return renderInlineLine(entry.layout.segments, chunkKit, key);
-    }
-  });
+function renderBlock(block: EmphasisBlock, kit: RenderKit, index: number): ReactNode {
+  const key = String(index);
+  switch (block.type) {
+    case "markdown":
+      return <Markdown key={key}>{block.text}</Markdown>;
+    case "heading":
+      return renderHeadingBlock(block, kit, key);
+    case "chips":
+      return renderChipsBlock(block, kit, key);
+    case "list":
+      return renderListBlock(block, kit, key);
+    case "stepper":
+      return renderStepperRow(block.steps, kit, key);
+    case "gauge":
+      return renderGaugeBlock(block, kit, key);
+    case "tree":
+      return renderTreeBlock(block.lines, kit, key);
+    case "table":
+      return <EmphasisTable key={key} table={block.table} kit={kit} />;
+  }
 }
 
 /**
- * Draws an assistant message that carries emphasis markup. Decorated lines render through
- * this component; plain runs and fenced code delegate to the host Markdown renderer.
- * Rendering only: the copy affordance hands out the original markdown untouched.
+ * Draws an assistant message that carries emphasis markup. Prose, links, code spans,
+ * blockquotes, and plain lists/tables delegate to Paseo `<Markdown>`; status pills,
+ * action badges, steppers, gauges, trees, and decorated tables render natively.
  */
 export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps<EmphasisData>) {
   const data = emphasisDataSchema.parse(item.data);
   const toast = useToast();
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const kit = useMemo<RenderKit>(
     () => ({
@@ -70,43 +59,39 @@ export function EmphasisMessage({ item, theme, layout }: PluginTimelineItemProps
       colors: theme.colors,
       compact: layout.compact,
       phase: data.phase,
-      fontSize: layout.compact ? 13 : 14,
-      gutterMode: false,
+      iconSize: layout.compact ? 12 : 13,
     }),
     [theme, layout, data.phase],
   );
 
   const handleCopy = useCallback(() => {
-    copyText(data.text).catch((error: unknown) => {
-      toast.error("Copy failed");
-      console.error("emphasis copy failed", error);
-    });
+    copyText(data.text)
+      .then(() => {
+        setCopied(true);
+        if (timerRef.current !== null) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          setCopied(false);
+          timerRef.current = null;
+        }, 1500);
+      })
+      .catch((error: unknown) => {
+        toast.error("Copy failed");
+        console.error("emphasis copy failed", error);
+      });
   }, [data.text, toast]);
 
   return (
     <View style={kit.styles.message}>
-      {data.blocks.map((block, blockIndex) =>
-        block.type === "markdown" ? (
-          <Markdown key={blockIndex}>{block.text}</Markdown>
-        ) : block.type === "table" ? (
-          <View key={blockIndex}>
-            <EmphasisTable table={block.table} kit={kit} />
-          </View>
-        ) : (
-          <View key={blockIndex} style={kit.styles.chunk}>
-            {renderChunkLines(block.lines, kit, blockIndex)}
-          </View>
-        ),
-      )}
+      {data.blocks.map((block, index) => renderBlock(block, kit, index))}
       {data.phase === "complete" ? (
         <Pressable
-          accessibilityLabel="Copy message markdown"
+          accessibilityLabel={copied ? "Copied message markdown" : "Copy message markdown"}
           accessibilityRole="button"
           hitSlop={8}
           onPress={handleCopy}
           style={kit.styles.copyButton}
         >
-          <Icon name="Copy" size={13} color={theme.colors.foregroundMuted} />
+          <Icon name={copied ? "Check" : "Copy"} size={13} color={theme.colors.foregroundMuted} />
         </Pressable>
       ) : null}
     </View>

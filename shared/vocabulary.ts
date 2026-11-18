@@ -5,7 +5,7 @@ import type { EmphasisTone } from "./emphasis";
  * are accepted and colored the same.
  */
 export const VOCABULARY: Record<
-  Exclude<EmphasisTone, "neutral">,
+  Exclude<EmphasisTone, "neutral" | "action">,
   { core: string[]; also: string[] }
 > = {
   error: {
