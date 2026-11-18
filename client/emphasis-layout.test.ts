@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { EmphasisTone } from "../shared/emphasis";
 import type { EmphasisSegment } from "../shared/emphasis";
 import { parseEmphasis } from "./parse-emphasis";
-import { planLineLayout, type PillSegment } from "./emphasis-layout";
+import {
+  emphasisLineText,
+  groupTreeEntries,
+  planLineLayout,
+  type PillSegment,
+} from "./emphasis-layout";
 
 const text = (value: string, bold = false): EmphasisSegment => ({
   type: "text",
@@ -35,13 +40,12 @@ describe("planLineLayout", () => {
     });
   });
 
-  it("renders an icon-anchored line as a leading row", () => {
+  it("renders an icon-anchored line as a badge row", () => {
     const layout = planLineLayout([text("- "), icon("Zap"), text("Cause:", true)]);
     expect(layout).toEqual({
       type: "row",
       marker: { kind: "bullet" },
-      icon: "Zap",
-      labelText: "Cause:",
+      leadBadge: { icon: "Zap", word: "Cause" },
       chips: [],
     });
   });
@@ -104,18 +108,37 @@ describe("planLineLayout", () => {
     }
   });
 
-  it("plans a parsed tree line with depth and rails", () => {
+  it("plans a parsed tree line as a tree marker", () => {
     const data = parseEmphasis("│   └── render", "complete");
     const layout = planLineLayout(
       data?.blocks[0]?.type === "chunk" ? data.blocks[0].lines[0].segments : [],
     );
-    expect(layout.type).toBe("tree");
-    if (layout.type === "tree") {
-      expect(layout.depth).toBe(1);
-      expect(layout.rails).toEqual([true]);
-      expect(layout.glyph).toBe("last");
-      expect(layout.rest).toHaveLength(1);
+    expect(layout).toEqual({ type: "tree" });
+  });
+
+  it("coalesces consecutive tree lines into one run", () => {
+    const data = parseEmphasis("├── client/\n│   └── parts.tsx\n\nnon-tree", "complete");
+    const chunk = data?.blocks[0];
+    const lines = chunk && chunk.type === "chunk" ? chunk.lines : [];
+    const planned = lines.map((line, index) => ({
+      line,
+      index,
+      layout: planLineLayout(line.segments),
+    }));
+    const runs = groupTreeEntries(planned);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.kind).toBe("tree-run");
+    if (runs[0]?.kind === "tree-run") {
+      expect(runs[0].entries).toHaveLength(2);
     }
+  });
+
+  it("reconstructs the literal text of a parsed line", () => {
+    const data = parseEmphasis("├── **bold** `code`", "complete");
+    const line = data?.blocks[0];
+    expect(line !== undefined && line.type === "chunk" ? emphasisLineText(line.lines[0]) : "").toBe(
+      "├── bold code",
+    );
   });
 
   it("plans a leading gauge as a gauge row", () => {
@@ -146,7 +169,7 @@ describe("planLineLayout over parsed lines", () => {
     expect(layout.type).toBe("row");
     if (layout.type === "row") {
       expect(layout.marker).toEqual({ kind: "bullet" });
-      expect(layout.labelText).toBe("Status:");
+      expect(layout.leadBadge).toEqual({ icon: "Gauge", word: "Status" });
       expect(layout.chips.map((chip) => chip.label)).toEqual(["Done 6", "Failed 1"]);
       expect(layout.rest?.length).toBeGreaterThan(0);
     }
@@ -159,7 +182,7 @@ describe("planLineLayout over parsed lines", () => {
     const layout = planLineLayout(line?.segments ?? []);
     expect(layout.type).toBe("row");
     if (layout.type === "row") {
-      expect(layout.labelText).toBe("Next:");
+      expect(layout.leadBadge).toEqual({ icon: "ArrowRight", word: "Next" });
       const rest = layout.rest ?? [];
       expect(
         rest.some((segment) => segment.type === "text" && segment.text.includes("install")),

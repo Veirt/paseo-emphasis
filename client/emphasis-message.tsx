@@ -3,7 +3,7 @@ import { Icon, Markdown, copyText, useToast } from "@getpaseo/plugin/client/ui";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { emphasisDataSchema, type EmphasisData, type EmphasisLine } from "../shared/emphasis";
-import { planLineLayout } from "./emphasis-layout";
+import { groupTreeEntries, planLineLayout, type PlannedLine } from "./emphasis-layout";
 import { buildStyles, type RenderKit } from "./emphasis-style";
 import { renderInlineLine } from "./emphasis-parts";
 import {
@@ -11,30 +11,40 @@ import {
   renderHeading,
   renderRow,
   renderStepper,
-  renderTree,
+  renderTreePanel,
 } from "./emphasis-rows";
 import { EmphasisTable } from "./emphasis-table";
 
 /** Dispatches one chunk's planned lines: headings and structure rows to their renderers. */
 function renderChunkLines(lines: EmphasisLine[], kit: RenderKit, baseKey: number): ReactNode[] {
-  const planned = lines.map((line) => ({
+  const planned: PlannedLine[] = lines.map((line, index) => ({
     line,
+    index,
     layout: line.heading === undefined ? planLineLayout(line.segments) : undefined,
   }));
   const gutterMode = planned.some(
     (entry) => entry.layout === undefined || entry.layout.type !== "inline",
   );
   const chunkKit: RenderKit = { ...kit, gutterMode };
-  return planned.map((entry, index) => {
-    if (entry.layout === undefined) {
-      return renderHeading(entry.line, chunkKit, `${baseKey}-${index}`);
+  return groupTreeEntries(planned).map((group) => {
+    if (group.kind === "tree-run") {
+      const first = group.entries[0];
+      return renderTreePanel(
+        group.entries.map((entry) => entry.line),
+        chunkKit,
+        `${baseKey}-tree-${first === undefined ? 0 : first.index}`,
+      );
     }
-    const key = `${baseKey}-${index}`;
+    const { entry } = group;
+    if (group.kind === "heading" || entry.layout === undefined) {
+      return renderHeading(entry.line, chunkKit, `${baseKey}-${entry.index}`);
+    }
+    const key = `${baseKey}-${entry.index}`;
     switch (entry.layout.type) {
       case "row":
         return renderRow(entry.layout, chunkKit, key);
       case "tree":
-        return renderTree(entry.layout, chunkKit, key);
+        return renderTreePanel([entry.line], chunkKit, key);
       case "stepper":
         return renderStepper(entry.layout, chunkKit, key);
       case "gauge-row":

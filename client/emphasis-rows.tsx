@@ -4,15 +4,13 @@ import { Fragment } from "react";
 import { Text, View } from "react-native";
 import type { EmphasisLine } from "../shared/emphasis";
 import {
+  emphasisLineText,
   type GaugeLayout,
   type RowLayout,
   type StepperLayout,
-  type TreeLayout,
 } from "./emphasis-layout";
 import {
   GUTTER,
-  RAIL_INSET,
-  RAIL_STEP,
   gaugeTone,
   headingSize,
   markIcon,
@@ -22,25 +20,55 @@ import {
 } from "./emphasis-style";
 import { MiniBar, renderChip, renderGutterMarker, renderInlineSegment } from "./emphasis-parts";
 
+/**
+ * A tree run rendered as one monospace panel: literal glyphs and paths on a
+ * tinted surface, so a tree scans as source, not as prose with drawn rails.
+ */
+export function renderTreePanel(lines: EmphasisLine[], kit: RenderKit, key: string): ReactNode {
+  return (
+    <View key={key} style={kit.styles.codePanel}>
+      {lines.map((line, index) => (
+        <Text key={index} selectable style={kit.styles.codeLine}>
+          {emphasisLineText(line)}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function rowHasNoLead(row: RowLayout): boolean {
-  return row.icon === undefined && row.leadMark === undefined && row.marker === undefined;
+  return row.leadBadge === undefined && row.leadMark === undefined && row.marker === undefined;
 }
 
 export function renderRow(layout: RowLayout, kit: RenderKit, key: string): ReactNode {
-  const { styles } = kit;
+  const { styles, colors } = kit;
+  const badge = layout.leadBadge;
+  const badgeVisual = toneVisual("mode", colors);
   // Chip-led rows keep no gutter marker: the chip is the marker.
   const chipLead =
     rowHasNoLead(layout) && layout.chips.length > 0 && layout.labelText === undefined;
-  const callout = (layout.icon !== undefined || layout.leadMark !== undefined) && !layout.marker;
-  const labelSpans = layout.labelText !== undefined;
+  const callout = ((badge !== undefined || layout.leadMark !== undefined) && !layout.marker) as
+    | boolean
+    | undefined;
+  const labelSpans = badge !== undefined || layout.labelText !== undefined;
   return (
     <View key={key} style={[styles.row, callout ? styles.callout : null]}>
       {chipLead ? null : (
         <View style={[styles.gutter, callout ? { width: GUTTER - 2 } : null]}>
-          {renderGutterMarker(layout.marker, layout.icon, layout.leadMark, kit)}
+          {renderGutterMarker(layout.marker, undefined, layout.leadMark, kit)}
         </View>
       )}
       <View style={[styles.content, { alignItems: labelSpans ? "flex-start" : "center" }]}>
+        {badge !== undefined ? (
+          <View style={[styles.pill, { backgroundColor: badgeVisual.background }]}>
+            <Icon name={badge.icon} size={kit.fontSize - 1} color={badgeVisual.foreground} />
+            {badge.word !== undefined ? (
+              <Text selectable style={[styles.pillText, { color: badgeVisual.foreground }]}>
+                {badge.word}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         {layout.labelText ? (
           <Text selectable style={styles.leadLabel}>
             {layout.labelText}
@@ -68,88 +96,6 @@ export function renderRow(layout: RowLayout, kit: RenderKit, key: string): React
               name={markIcon(layout.trailingMark.pass)}
               size={kit.fontSize - 1}
               color={layout.trailingMark.pass ? kit.colors.statusSuccess : kit.colors.statusDanger}
-            />
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-/** A tree drawn with views: rail columns per ancestor level, tick per node. */
-export function renderTree(layout: TreeLayout, kit: RenderKit, key: string): ReactNode {
-  const { styles, colors, fontSize } = kit;
-  const rail = tinted(colors.foreground, 0x45);
-  const rest = layout.rest;
-  const first = rest[0];
-  const last = rest.at(-1);
-  const leadMark = first?.type === "mark" ? first : undefined;
-  const trailingMark = rest.length > 1 && last?.type === "mark" ? last : undefined;
-  const middle = rest.slice(
-    leadMark !== undefined ? 1 : 0,
-    trailingMark !== undefined ? -1 : undefined,
-  );
-  return (
-    <View key={key} style={styles.row}>
-      <View style={{ flexDirection: "row", alignSelf: "stretch" }}>
-        {layout.rails.map((passes, index) => (
-          <View key={`rail-${index}`} style={styles.rail}>
-            {passes ? (
-              <View
-                style={{
-                  marginLeft: RAIL_INSET,
-                  width: 1,
-                  alignSelf: "stretch",
-                  backgroundColor: rail,
-                }}
-              />
-            ) : null}
-          </View>
-        ))}
-        <View style={styles.rail}>
-          <View
-            style={{
-              position: "absolute",
-              left: RAIL_INSET,
-              top: 0,
-              bottom: layout.glyph === "mid" ? 0 : "50%",
-              width: 1,
-              backgroundColor: rail,
-            }}
-          />
-          <View
-            style={{
-              position: "absolute",
-              left: RAIL_INSET,
-              top: "50%",
-              width: RAIL_STEP - RAIL_INSET,
-              height: 1,
-              backgroundColor: rail,
-            }}
-          />
-        </View>
-      </View>
-      <View style={{ flex: 1, paddingLeft: 6, flexDirection: "row", alignItems: "center" }}>
-        {leadMark ? (
-          <View style={{ marginRight: 5 }}>
-            <Icon
-              name={markIcon(leadMark.pass)}
-              size={fontSize - 1}
-              color={leadMark.pass ? colors.statusSuccess : colors.statusDanger}
-            />
-          </View>
-        ) : null}
-        {middle.length > 0 ? (
-          <Text selectable style={[styles.line, { flexShrink: 1 }]}>
-            {middle.map((segment, index) => renderInlineSegment(segment, kit, index))}
-          </Text>
-        ) : null}
-        {trailingMark ? (
-          <View style={{ marginLeft: 5 }}>
-            <Icon
-              name={markIcon(trailingMark.pass)}
-              size={fontSize - 1}
-              color={trailingMark.pass ? colors.statusSuccess : colors.statusDanger}
             />
           </View>
         ) : null}

@@ -1,4 +1,4 @@
-import type { EmphasisSegment, EmphasisTone, Gauge } from "../shared/emphasis";
+import type { EmphasisLine, EmphasisSegment, EmphasisTone, Gauge } from "../shared/emphasis";
 
 export type PillSegment = Extract<EmphasisSegment, { type: "pill" }>;
 
@@ -23,7 +23,8 @@ export type LineLayout =
   | {
       type: "row";
       marker?: ListMarker;
-      icon?: string;
+      /** A lead badge: icon plus label word, for icon-anchored lead-ins like "Next:". */
+      leadBadge?: { icon: string; word?: string };
       /** A leading status mark, drawn as an icon in the gutter. */
       leadMark?: { pass: boolean };
       labelText?: string;
@@ -42,15 +43,8 @@ export type LineLayout =
 
 export type RowLayout = Extract<LineLayout, { type: "row" }>;
 
-/** A tree node parsed into rails: depth, whether ancestor rails pass through, and the elbow. */
-export type TreeLayout = {
-  type: "tree";
-  depth: number;
-  /** Per ancestor level, whether the rail passes through this row. */
-  rails: boolean[];
-  glyph: "mid" | "last";
-  rest: EmphasisSegment[];
-};
+/** A tree line: rail glyphs follow tree syntax and render in a monospace panel. */
+export type TreeLayout = { type: "tree" };
 
 /** An arrow chain of short words or pills, drawn as chips with chevrons. */
 export type StepperLayout = {
@@ -164,9 +158,10 @@ function gaugeAt(
 }
 
 /**
- * Plans a tree line: a rail prefix (`│   `, or four spaces per skipped level)
- * followed by a `├──`/`└──` connector. The glyphs are read as structure and
- * dropped; the node content follows. Returns undefined for anything else.
+ * Recognizes a tree line: a rail prefix (`│   `, or four spaces per skipped
+ * level) followed by a `├──`/`└──` connector. The glyphs stay literal; the
+ * renderer draws the run as one monospace panel. Returns undefined for
+ * anything else.
  */
 function treePlanAt(segments: readonly EmphasisSegment[], start: number): TreeLayout | undefined {
   let railSource = "";
@@ -178,36 +173,19 @@ function treePlanAt(segments: readonly EmphasisSegment[], start: number): TreeLa
   const connector = segments[cursor];
   if (connector?.type !== "tree" || !/^[├└]──$/.test(connector.text)) return undefined;
 
-  const rails: boolean[] = [];
   let index = 0;
   while (index < railSource.length) {
     const char = railSource[index];
     if (char === "│" || char === "|") {
-      rails.push(true);
       index += 1;
       while (railSource[index] === " ") index += 1;
     } else if (railSource.startsWith("    ", index)) {
-      rails.push(false);
       index += 4;
     } else {
       return undefined;
     }
   }
-
-  const rest = segments.slice(cursor + 1);
-  const first = rest[0];
-  if (first?.type === "text") {
-    const trimmed = first.text.replace(/^ +/, "");
-    if (trimmed.length === 0) rest.shift();
-    else rest[0] = { ...first, text: trimmed };
-  }
-  return {
-    type: "tree",
-    depth: rails.length,
-    rails,
-    glyph: connector.text.startsWith("├") ? "mid" : "last",
-    rest,
-  };
+  return { type: "tree" };
 }
 
 /** One step token of an arrow chain: a single short word, no sentence punctuation. */
@@ -354,9 +332,12 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
   }
 
   if (first.type === "icon") {
-    // The label is the bold run only, so plain prose after it stays normal weight.
+    // An icon-anchored lead-in becomes a badge: icon plus label word, no colon.
     const row = labeledRowFrom(segments, index + 1, marker);
-    row.icon = first.name;
+    const word = row.labelText?.replace(/[:\s]+$/u, "");
+    delete row.labelText;
+    row.leadBadge =
+      word !== undefined && word.length > 0 ? { icon: first.name, word } : { icon: first.name };
     return row;
   }
 
@@ -372,4 +353,69 @@ export function planLineLayout(segments: EmphasisSegment[]): LineLayout {
   }
 
   return { type: "inline", segments };
+}
+
+/** The literal text a parsed line carries: glyphs, paths, and pill labels, in order. */
+export function emphasisLineText(line: EmphasisLine): string {
+  let text = "";
+  for (const segment of line.segments) {
+    switch (segment.type) {
+      case "text":
+      case "code":
+      case "tree":
+        text += segment.text;
+        break;
+      case "pill":
+        text += segment.label;
+        break;
+      case "icon":
+        break;
+      case "arrow":
+        text += "→";
+        break;
+      case "mark":
+        text += segment.pass ? "✓" : "✗";
+        break;
+      case "gauge":
+        text +=
+          "▰".repeat(segment.filled) + "▱".repeat(Math.max(0, segment.total - segment.filled));
+        break;
+    }
+  }
+  return text;
+}
+
+/** One chunk line with its planned layout; `layout` is undefined for headings. */
+export interface PlannedLine {
+  line: EmphasisLine;
+  index: number;
+  layout: LineLayout | undefined;
+}
+
+/** How a chunk's planned lines group for rendering. */
+export type LineGroup =
+  | { kind: "tree-run"; entries: PlannedLine[] }
+  | { kind: "heading"; entry: PlannedLine }
+  | { kind: "line"; entry: PlannedLine };
+
+/** Consecutive tree lines coalesce into one monospace panel; anything else breaks the run. */
+export function groupTreeEntries(entries: readonly PlannedLine[]): LineGroup[] {
+  const groups: LineGroup[] = [];
+  let open: PlannedLine[] | undefined;
+  const flush = () => {
+    if (open !== undefined) {
+      groups.push({ kind: "tree-run", entries: open });
+      open = undefined;
+    }
+  };
+  for (const entry of entries) {
+    if (entry.layout?.type === "tree") {
+      (open ??= []).push(entry);
+      continue;
+    }
+    flush();
+    groups.push(entry.layout === undefined ? { kind: "heading", entry } : { kind: "line", entry });
+  }
+  flush();
+  return groups;
 }

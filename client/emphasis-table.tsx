@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 import type { EmphasisAlign, EmphasisLine, EmphasisTable } from "../shared/emphasis";
-import { planLineLayout } from "./emphasis-layout";
+import { emphasisLineText, planLineLayout } from "./emphasis-layout";
 import { MiniBar, renderChip, renderInlineSegment } from "./emphasis-parts";
 import { gaugeTone, tinted, toneVisual, type RenderKit } from "./emphasis-style";
 import { renderStepper } from "./emphasis-rows";
@@ -65,10 +65,10 @@ function CellContent({
     );
   }
   if (layout.type === "tree") {
-    // A tree inside a cell degrades to its node text; rails are prose-level structure.
+    // A tree inside a cell degrades to its literal line text.
     return (
       <Text selectable style={[kit.styles.line, textAlign ? { textAlign } : null]}>
-        {layout.rest.map((segment, index) => renderInlineSegment(segment, kit, index))}
+        {emphasisLineText(line)}
       </Text>
     );
   }

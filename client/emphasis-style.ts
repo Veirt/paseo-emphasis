@@ -13,10 +13,6 @@ type Platform = PluginTimelineItemProps["layout"]["platform"];
 
 /** The marker gutter every row hangs its markers into; text aligns past it. */
 export const GUTTER = 22;
-/** Horizontal distance between tree rail levels; node text reaches the body column at depth 0. */
-export const RAIL_STEP = 16;
-/** A rail is drawn this far into its column. */
-export const RAIL_INSET = 3;
 
 /** Spacing around a section heading: air above, a tight tie to its content. */
 const HEADING_GAP_TOP = 18;
@@ -112,7 +108,8 @@ interface EmphasisStyles {
   gutter: ViewStyle;
   content: ViewStyle;
   callout: ViewStyle;
-  rail: ViewStyle;
+  codePanel: ViewStyle;
+  codeLine: TextStyle;
   sectionRow: ViewStyle;
   leadRest: TextStyle;
   line: TextStyle;
@@ -156,7 +153,19 @@ export function buildStyles(
     gutter: { width: GUTTER },
     content: { flexDirection: "row", flex: 1, gap: 8 },
     callout: { borderLeftWidth: 2, borderLeftColor: tinted(theme.foreground, 0x30) },
-    rail: { width: RAIL_STEP, flexDirection: "row", alignSelf: "stretch" },
+    codePanel: {
+      backgroundColor: theme.surface2,
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: compact ? 8 : 12,
+      gap: 1,
+    },
+    codeLine: {
+      fontSize: compact ? 12 : 13,
+      fontFamily: monospaceFamily(platform),
+      color: theme.foreground,
+    },
     sectionRow: {
       marginTop: compact ? 14 : HEADING_GAP_TOP,
       marginBottom: compact ? 3 : HEADING_GAP_BOTTOM,
