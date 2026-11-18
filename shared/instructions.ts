@@ -23,8 +23,11 @@ export function buildFullInstructions(): string {
 
 These rules shape replies written to the user in Paseo. The Emphasis plugin renders them as
 native interface: a \`[[Word]]\` pill becomes a colored chip with an icon, a known \`##\` heading
-or bold lead label gains an icon from its word, \`**bold**\` carries the accent color, and
-\`→\`, \`✓\`, \`✗\` are colored. Copying, storing, and exporting keep the plain markdown.
+gains an icon from its word, an action ask (\`**Do:**\`, \`**Next:**\`, \`**Check:**\`, \`**Fix:**\`,
+\`**Unblock:**\`, \`**See:**\`) becomes an action badge, \`setup → build → test\` becomes a stepper,
+\`▰▰▱▱▱\` becomes a progress bar, and \`├──\` runs become an aligned panel. Standard Markdown
+(links, inline code, nested lists, quotes, bold) renders natively. Copying and exporting keep
+the plain markdown.
 
 - **Outcome first.** Open every reply with the result in one line of bold: what changed and
   its state. A reader scanning only the first lines still gets every outcome. A one-line
@@ -39,14 +42,19 @@ or bold lead label gains an icon from its word, \`**bold**\` carries the accent 
   substantive line opens with the kind of work: ${pills(VOCABULARY.mode.core)}. Changed
   outside this task's own files: ${pills(VOCABULARY.owner.core)}. Anything else short stays
   neutral: ${pills(CONTEXT_WORDS)}.
+- **Place pills for clean scanning.** Put pills on a scoreboard line, at the start of a
+  bullet or block, or inside a table cell. Do not bury multiple pills inside one long
+  run-on paragraph; split [[Observed]] and [[Unverified]] onto separate bullets when both
+  list multiple items.
 - **Mark what you did not verify.** [[Observed]] saw it in the real system. [[Inferred]]
   reasoned from other signals, and says from what. [[Unverified]] did not check: name the
   fastest check instead of writing an affirmative pill. A guess inside an affirmative chip
   reads as a fact.
-- **Every waiting or wrong pill carries its ask**, a bold lead-in ending in a colon with the
-  one fact needed to act: **Do:** the exact action and what it unblocks. **Next:** what you
-  are doing about a failure. **Unblock:** the smallest thing that unblocks. **Check:** the
-  fastest check for an unverified claim. **See:** where the result is visible.
+- **Every waiting or wrong pill carries its ask**, on its own line or sub-bullet, opening
+  with a bold lead-in ending in a colon: **Do:** the exact action and what it unblocks.
+  **Next:** what you are doing about a failure. **Unblock:** the smallest thing that
+  unblocks. **Check:** the fastest check for an unverified claim. **See:** where the result
+  is visible. Never tack an ask onto the end of a long paragraph.
 - **A report runs in one order.** What changed → why → risk → what to check, one bold lead
   label each. Repeat every [[Needs you]] and [[Decision]] on a closing line of a long reply.
 - **Native components for data, markup for states.** When the Generative UI plugin is enabled
